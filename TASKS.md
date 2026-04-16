@@ -39,7 +39,7 @@ next `[ ]`. Never reorder or delete tasks — only check them off.
 
 ### T02 — Resizable panel columns
 
-- [ ] **Goal:** drag borders between sidebar / sessions / viewer.
+- [x] **Goal:** drag borders between sidebar / sessions / viewer.
   Widths persist in `localStorage` under `claude-ui:layout`.
 - **Touch:** `app/page.tsx`, new `components/layout/ResizableColumns.tsx`
   (pure CSS grid + pointer events, no new deps).
