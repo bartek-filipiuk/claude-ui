@@ -50,7 +50,7 @@ next `[ ]`. Never reorder or delete tasks — only check them off.
 
 ### T03 — Favorites / pin projects
 
-- [ ] **Goal:** star projects, pinned ones render on top of the sidebar
+- [x] **Goal:** star projects, pinned ones render on top of the sidebar
   regardless of last-activity sort.
 - **Touch:** extend `lib/aliases/io.ts` to a generic
   `lib/projects/meta.ts` storing `{ alias?: string, favorite?: boolean }`.
