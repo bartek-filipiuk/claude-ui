@@ -3,7 +3,7 @@ import { request } from 'node:http';
 import { createServer } from 'node:net';
 import { randomBytes } from 'node:crypto';
 import { resolve } from 'node:path';
-import { mkdtempSync, writeFileSync, mkdirSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { test, expect } from '@playwright/test';
 
@@ -53,30 +53,40 @@ function waitHealth(port: number, timeoutMs = 20_000): Promise<void> {
   });
 }
 
-/**
- * Phase-4 fixture needs a real project dir under $HOME with a JSONL that
- * declares cwd = <that dir>. We build it in a tmp HOME so the Terminal can
- * actually spawn $SHELL there (unlike /tmp/alpha in the shared fixture).
- */
 function buildFakeHome() {
-  const home = mkdtempSync(`${tmpdir()}/claude-ui-phase4-`);
-  const projectDir = `${home}/proj`;
-  mkdirSync(projectDir, { recursive: true });
-  const slug = projectDir.replace(/\//g, '-');
-  const projectsDir = `${home}/.claude/projects/${slug}`;
-  mkdirSync(projectsDir, { recursive: true });
-  const sessionId = '00000000-0000-4000-8000-0000000000ab';
-  const jsonl =
-    JSON.stringify({
-      type: 'user',
-      sessionId,
-      uuid: 'u-1',
-      timestamp: '2026-04-15T10:00:00.000Z',
-      cwd: projectDir,
-      message: { role: 'user', content: 'phase 4 fixture' },
-    }) + '\n';
-  writeFileSync(`${projectsDir}/${sessionId}.jsonl`, jsonl);
-  return { home, projectDir };
+  const home = mkdtempSync(`${tmpdir()}/claude-ui-phase5-`);
+  // Hex-only session IDs — lib/jsonl/index accepts only canonical UUID shape.
+  const ids = {
+    alpha: '00000000-0000-4000-8000-aaaaaaaaaaaa',
+    beta: '11111111-0000-4000-8000-bbbbbbbbbbbb',
+    gamma: '22222222-0000-4000-8000-cccccccccccc',
+  } as const;
+  const make = (name: keyof typeof ids) => {
+    const pdir = `${home}/${name}`;
+    mkdirSync(pdir, { recursive: true });
+    const slug = pdir.replace(/\//g, '-');
+    const pdirSession = `${home}/.claude/projects/${slug}`;
+    mkdirSync(pdirSession, { recursive: true });
+    const sessionId = ids[name];
+    writeFileSync(
+      `${pdirSession}/${sessionId}.jsonl`,
+      JSON.stringify({
+        type: 'user',
+        sessionId,
+        uuid: 'u-1',
+        timestamp: '2026-04-15T10:00:00.000Z',
+        cwd: pdir,
+        message: { role: 'user', content: `fixture for ${name}` },
+      }) + '\n',
+    );
+    return { cwd: pdir, sessionId };
+  };
+  return {
+    home,
+    alpha: make('alpha'),
+    beta: make('beta'),
+    gamma: make('gamma'),
+  };
 }
 
 let port: number;
@@ -119,25 +129,44 @@ test.beforeEach(async ({ page }) => {
   expect(res.status()).toBe(302);
 });
 
-test('otwieram terminal → widzę output shella', async ({ page }) => {
+test('3 zakładki shella, przełączanie, zamknięcie', async ({ page }) => {
   await page.goto(`http://127.0.0.1:${port}/`);
-  await page.locator('aside button').filter({ hasText: /proj/ }).first().click();
-  await page.getByRole('button', { name: '+ shell' }).click();
-  await expect(page.getByText('ready').first()).toBeVisible({ timeout: 10_000 });
 
-  const host = page.locator('.xterm').first();
-  await host.click();
-  await page.keyboard.type('echo hello-from-playwright\n');
-  await expect(page.locator('.xterm-rows')).toContainText('hello-from-playwright', {
-    timeout: 10_000,
+  // Wait until the project list renders — it contains buttons with "/alpha"
+  // substring. With a mutable tmpdir HOME the exact displayed path depends
+  // on whether resolvedCwd was sniffed; we match just the trailing segment.
+  await expect(page.locator('aside button').filter({ hasText: /alpha/ }).first()).toBeVisible({
+    timeout: 15_000,
   });
-});
 
-test('zamknięcie terminala przywraca viewer', async ({ page }) => {
-  await page.goto(`http://127.0.0.1:${port}/`);
-  await page.locator('aside button').filter({ hasText: /proj/ }).first().click();
-  await page.getByRole('button', { name: '+ shell' }).click();
+  const newShell = page.getByRole('button', { name: '+ shell' });
+  const clickProject = (name: string) =>
+    page.locator('aside button').filter({ hasText: new RegExp(name) }).first().click();
+
+  await clickProject('alpha');
+  await newShell.click();
   await expect(page.getByText('ready').first()).toBeVisible({ timeout: 10_000 });
-  await page.getByRole('button', { name: 'Pokaż historię' }).click();
-  await expect(page.getByRole('heading', { name: 'Historia' })).toBeVisible();
+
+  await clickProject('beta');
+  await newShell.click();
+  await expect(page.getByRole('tab')).toHaveCount(2);
+
+  await clickProject('gamma');
+  await newShell.click();
+  await expect(page.getByRole('tab')).toHaveCount(3);
+
+  // Tab header shows counter 3/16.
+  await expect(page.getByText(/Terminal · 3\/16/)).toBeVisible();
+
+  // Click first tab, check active state.
+  const tabs = page.getByRole('tab');
+  await tabs.nth(0).click();
+  await expect(tabs.nth(0)).toHaveAttribute('aria-selected', 'true');
+
+  // Close middle tab via × button.
+  await tabs
+    .nth(1)
+    .getByRole('button', { name: 'Zamknij zakładkę' })
+    .click();
+  await expect(page.getByRole('tab')).toHaveCount(2);
 });
