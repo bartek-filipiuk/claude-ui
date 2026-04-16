@@ -90,56 +90,39 @@ test.beforeEach(async ({ page }) => {
   expect(res.status()).toBe(302);
 });
 
-test('widzę 5 projektów z fixture', async ({ page }) => {
-  const consoleMsgs: string[] = [];
-  page.on('console', (m) => consoleMsgs.push(`${m.type()}: ${m.text()}`));
-  page.on('pageerror', (e) => consoleMsgs.push(`pageerror: ${e.message}`));
-  page.on('requestfailed', (r) =>
-    consoleMsgs.push(`reqfail: ${r.url()} ${r.failure()?.errorText}`),
-  );
+test('otwieram sesję → widzę wiadomości', async ({ page }) => {
   await page.goto(`http://127.0.0.1:${port}/`);
-  try {
-    await expect(page.getByText('/tmp/alpha')).toBeVisible({ timeout: 10_000 });
-  } catch (err) {
-    console.error('CONSOLE LOG DUMP:\n' + consoleMsgs.join('\n'));
-    throw err;
-  }
-  await expect(page.getByText('/tmp/beta')).toBeVisible();
-  await expect(page.getByText('/tmp/gamma')).toBeVisible();
-  await expect(page.getByText('/tmp/delta')).toBeVisible();
-  await expect(page.getByText('/tmp/epsilon')).toBeVisible();
+  await page.getByText('/tmp/alpha').click();
+  // First session tile, click it.
+  await page.getByRole('button').filter({ hasText: /wiadomości/ }).first().click();
+  // Expected: user "Hello there" from fixture.
+  await expect(page.getByText('Hello there')).toBeVisible();
+  // Assistant text from fixture.
+  await expect(page.getByText('Hi, how can I help?')).toBeVisible();
+  // Tool use Bash label.
+  await expect(page.getByText('Bash')).toBeVisible();
 });
 
-test('search filtruje projekty', async ({ page }) => {
-  await page.goto(`http://127.0.0.1:${port}/`);
-  await page.getByLabel('Szukaj projektu').fill('beta');
-  await expect(page.getByText('/tmp/beta')).toBeVisible();
-  await expect(page.getByText('/tmp/alpha')).toHaveCount(0);
-});
-
-test('klik projekt → pokazuje listę sesji', async ({ page }) => {
-  await page.goto(`http://127.0.0.1:${port}/`);
-  await page.getByText('/tmp/epsilon').click();
-  // Epsilon ma 3 sesje.
-  await expect(page.getByText('3 wiadomości').first())
-    .toBeHidden({ timeout: 1000 })
-    .catch(() => {});
-  // Zamiast tego — 3 kafelki sesji.
-  const cards = page.getByRole('button').filter({ hasText: /wiadomości/ });
-  await expect(cards).toHaveCount(3);
-});
-
-test('XSS slug renderowany jako text, nie script', async ({ page }) => {
-  // Slush nie przejdzie walidacji (zawiera `<`), więc nie będzie w listingu —
-  // ale nazwy z gamma mają <script> w message content, co nie trafia do sidebara.
-  await page.goto(`http://127.0.0.1:${port}/`);
+test('XSS w assistant content nie odpala alert', async ({ page }) => {
   const alerts: string[] = [];
   page.on('dialog', async (d) => {
     alerts.push(d.message());
     await d.dismiss();
   });
+  await page.goto(`http://127.0.0.1:${port}/`);
   await page.getByText('/tmp/gamma').click();
-  await expect(page.getByText(/wiadomości/).first()).toBeVisible();
-  // Nie powinno było być żadnego alertu (brak script eval).
+  await page.getByRole('button').filter({ hasText: /wiadomości/ }).first().click();
+  // The raw markdown contains <script>alert(1)</script> inside backticks.
+  await expect(page.getByText(/safe rendering/)).toBeVisible();
   expect(alerts).toHaveLength(0);
+});
+
+test('search w sesji podświetla i nawiguje', async ({ page }) => {
+  await page.goto(`http://127.0.0.1:${port}/`);
+  await page.getByText('/tmp/alpha').click();
+  await page.getByRole('button').filter({ hasText: /wiadomości/ }).first().click();
+  const searchBox = page.getByLabel('Szukaj w sesji');
+  await searchBox.fill('Hello');
+  // counter shows "1/N".
+  await expect(page.getByText(/^1\//)).toBeVisible();
 });
