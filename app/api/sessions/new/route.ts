@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
 import { isValidSlug } from '@/lib/jsonl/slug';
-import { listProjects } from '@/lib/jsonl/index';
+import { inferCwdFromSlug, listProjects } from '@/lib/jsonl/index';
 import { assertInside } from '@/lib/security/path-guard';
 import { PATHS } from '@/lib/server/config';
 import { logger } from '@/lib/server/logger';
@@ -38,13 +38,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   if (!project) {
     return NextResponse.json({ error: 'project_not_found' }, { status: 404 });
   }
-  if (!project.resolvedCwd) {
+  const resolvedCwd = project.resolvedCwd ?? (await inferCwdFromSlug(parsed.slug));
+  if (!resolvedCwd) {
     return NextResponse.json({ error: 'no_resolved_cwd' }, { status: 409 });
   }
 
   let safeCwd: string;
   try {
-    safeCwd = await assertInside(PATHS.HOME, project.resolvedCwd);
+    safeCwd = await assertInside(PATHS.HOME, resolvedCwd);
   } catch (err) {
     logger.warn({ err: (err as Error).message }, 'sessions_new_cwd_escape');
     return NextResponse.json({ error: 'cwd_outside_home' }, { status: 403 });

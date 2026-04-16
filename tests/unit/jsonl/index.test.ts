@@ -1,5 +1,8 @@
-import { describe, expect, it, vi } from 'vitest';
-import { resolve } from 'node:path';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { mkdir, realpath, rm, utimes, writeFile, symlink } from 'node:fs/promises';
+import { randomBytes } from 'node:crypto';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 
 const FAKE_HOME = resolve(__dirname, '..', '..', 'fixtures', 'fake-home');
 
@@ -32,8 +35,26 @@ vi.mock('@/lib/server/config', async () => {
   };
 });
 
-const { listProjects, listSessions, resolveSessionPath, sessionPreview } =
+const { inferCwdFromSlug, listProjects, listSessions, resolveSessionPath, sessionPreview } =
   await import('@/lib/jsonl/index');
+
+// Normalize fixture mtimes so session ordering assertions are stable
+// regardless of how git checked the files out.
+beforeAll(async () => {
+  const epsilonDir = join(FAKE_HOME, '.claude', 'projects', '-tmp-epsilon');
+  const base = Date.parse('2026-04-15T00:00:00.000Z') / 1000;
+  const files = [
+    '44444444-0000-4000-8000-000000000001.jsonl',
+    '44444444-0000-4000-8000-000000000002.jsonl',
+    '44444444-0000-4000-8000-000000000003.jsonl',
+  ];
+  for (let i = 0; i < files.length; i++) {
+    const name = files[i];
+    if (!name) continue;
+    const t = base + i * 60;
+    await utimes(join(epsilonDir, name), t, t);
+  }
+});
 
 describe('listProjects (fake-home)', () => {
   it('wykrywa 5 projektów z fixture', async () => {
@@ -96,5 +117,83 @@ describe('sessionPreview', () => {
     // Fixture ma 10 poprawnych linii + 1 malformed.
     expect(preview.messageCount).toBe(10);
     expect(preview.firstUserPreview).toBe('Hello there');
+  });
+});
+
+describe('inferCwdFromSlug (legacy fallback)', () => {
+  let homeDir: string;
+  let otherDir: string;
+
+  beforeAll(async () => {
+    // Resolve any tmpdir symlinks up-front so the paths we build contain no
+    // components that would be lost when converting path -> slug -> path.
+    // Prefer /tmp (no dashes on Linux/macOS) to keep the slug round-trip clean.
+    const base = await realpath('/tmp').catch(() => realpath(tmpdir()));
+    const homeName = 'cluithome' + randomBytes(4).toString('hex');
+    const otherName = 'cluitother' + randomBytes(4).toString('hex');
+    homeDir = join(base, homeName);
+    otherDir = join(base, otherName);
+    await mkdir(homeDir);
+    await mkdir(otherDir);
+    await mkdir(join(homeDir, 'projectdir'));
+    await writeFile(join(homeDir, 'notadir'), 'hello');
+    await mkdir(join(otherDir, 'outside'));
+    await symlink(join(otherDir, 'outside'), join(homeDir, 'escape'));
+  });
+
+  afterAll(async () => {
+    await rm(homeDir, { recursive: true, force: true });
+    await rm(otherDir, { recursive: true, force: true });
+  });
+
+  it('(a) sniff hit wygrywa z fallbackiem', async () => {
+    // Alpha has sniffed cwd '/tmp/alpha' which is NOT under FAKE_HOME. If the
+    // fallback ran, it would return null and overwrite the sniff. Observing
+    // the sniffed value proves sniff-hit takes precedence.
+    const projects = await listProjects();
+    const alpha = projects.find((p) => p.slug === '-tmp-alpha');
+    expect(alpha?.resolvedCwd).toBe('/tmp/alpha');
+  });
+
+  it('(b) sniff miss + prawdziwy katalog pod $HOME zwraca ten katalog', async () => {
+    const slug = homeDir.replaceAll('/', '-') + '-projectdir';
+    const result = await inferCwdFromSlug(slug, homeDir);
+    expect(result).toBe(join(homeDir, 'projectdir'));
+  });
+
+  it('(c) sniff miss + katalog poza $HOME zwraca null', async () => {
+    const slug = otherDir.replaceAll('/', '-') + '-outside';
+    const result = await inferCwdFromSlug(slug, homeDir);
+    expect(result).toBeNull();
+  });
+
+  it('odrzuca symlink wskazujący poza $HOME', async () => {
+    const slug = homeDir.replaceAll('/', '-') + '-escape';
+    const result = await inferCwdFromSlug(slug, homeDir);
+    expect(result).toBeNull();
+  });
+
+  it('odrzuca nieistniejącą ścieżkę', async () => {
+    const slug = homeDir.replaceAll('/', '-') + '-nope';
+    const result = await inferCwdFromSlug(slug, homeDir);
+    expect(result).toBeNull();
+  });
+
+  it('odrzuca plik (nie katalog)', async () => {
+    const slug = homeDir.replaceAll('/', '-') + '-notadir';
+    const result = await inferCwdFromSlug(slug, homeDir);
+    expect(result).toBeNull();
+  });
+
+  it('odrzuca sam $HOME (nie podkatalog)', async () => {
+    const slug = homeDir.replaceAll('/', '-');
+    const result = await inferCwdFromSlug(slug, homeDir);
+    expect(result).toBeNull();
+  });
+
+  it('odrzuca invalid slug', async () => {
+    expect(await inferCwdFromSlug('../etc', homeDir)).toBeNull();
+    expect(await inferCwdFromSlug('foo/bar', homeDir)).toBeNull();
+    expect(await inferCwdFromSlug('', homeDir)).toBeNull();
   });
 });

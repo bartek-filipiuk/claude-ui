@@ -1,5 +1,5 @@
-import { readdir, stat } from 'node:fs/promises';
-import { join, basename } from 'node:path';
+import { readdir, realpath, stat } from 'node:fs/promises';
+import { join, basename, sep } from 'node:path';
 import { assertInside } from '@/lib/security/path-guard';
 import { PATHS } from '@/lib/server/config';
 import { parseJsonlStream } from './parser';
@@ -45,7 +45,8 @@ export async function listProjects(): Promise<ProjectSummary[]> {
     }
     if (!st.isDirectory()) continue;
     const sessions = await collectSessionFiles(dir);
-    const resolvedCwd = await sniffResolvedCwd(sessions[0]?.path ?? null);
+    const sniffed = await sniffResolvedCwd(sessions[0]?.path ?? null);
+    const resolvedCwd = sniffed ?? (await inferCwdFromSlug(name));
     out.push({
       slug: name,
       displayPath: resolvedCwd ?? decodeSlugToDisplayPath(name),
@@ -107,6 +108,43 @@ async function collectSessionFiles(dir: string): Promise<SessionSummary[]> {
   }
   out.sort((a, b) => b.mtime.localeCompare(a.mtime));
   return out;
+}
+
+/**
+ * Fallback for legacy projects whose JSONL events lack a `cwd` field.
+ * Decodes the slug heuristically (lossy: `foo-bar` could be /foo-bar or /foo/bar),
+ * resolves symlinks via realpath, and only returns the path if it's a real
+ * directory strictly under `homeDir`. Returns null otherwise — never leaks a
+ * path that escapes $HOME via symlink or slug-decoding ambiguity.
+ */
+export async function inferCwdFromSlug(
+  slug: string,
+  homeDir: string = PATHS.HOME,
+): Promise<string | null> {
+  if (!isValidSlug(slug)) return null;
+  const candidate = decodeSlugToDisplayPath(slug);
+  if (!candidate.startsWith('/')) return null;
+  let resolvedHome: string;
+  try {
+    resolvedHome = await realpath(homeDir);
+  } catch {
+    return null;
+  }
+  let resolvedCandidate: string;
+  try {
+    resolvedCandidate = await realpath(candidate);
+  } catch {
+    return null;
+  }
+  if (resolvedCandidate === resolvedHome) return null;
+  if (!resolvedCandidate.startsWith(resolvedHome + sep)) return null;
+  try {
+    const st = await stat(resolvedCandidate);
+    if (!st.isDirectory()) return null;
+  } catch {
+    return null;
+  }
+  return resolvedCandidate;
 }
 
 async function sniffResolvedCwd(filePath: string | null): Promise<string | null> {
