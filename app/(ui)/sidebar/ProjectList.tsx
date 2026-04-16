@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { timeAgo } from '@/lib/ui/format';
 import { cn } from '@/lib/utils';
 
@@ -128,44 +127,34 @@ function ProjectItem({
     <li>
       <div
         className={cn(
-          'group flex items-center rounded-md',
+          'flex items-stretch rounded-md',
           active ? 'bg-neutral-800' : 'hover:bg-neutral-900',
         )}
       >
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              type="button"
-              onClick={onSelect}
-              className="flex min-w-0 flex-1 items-center justify-between gap-2 px-3 py-2 text-left"
-            >
-              <span className="min-w-0 flex-1 truncate">
-                {alias ? (
-                  <span className="text-xs font-medium text-neutral-100">{primary}</span>
-                ) : (
-                  <span className="font-mono text-xs text-neutral-300">{primary}</span>
-                )}
-              </span>
-              <span className="ml-2 inline-flex shrink-0 items-center gap-2 text-[10px] text-neutral-400">
-                <span>{project.sessionCount}</span>
-                <span>{timeAgo(project.lastActivity)}</span>
-              </span>
-            </button>
-          </TooltipTrigger>
-          <TooltipContent side="right">
-            <div className="flex flex-col gap-0.5">
-              {alias && <span className="text-xs">{alias}</span>}
-              <span className="font-mono text-xs">{path}</span>
-              <span className="text-[10px] text-neutral-400">slug: {project.slug}</span>
-            </div>
-          </TooltipContent>
-        </Tooltip>
+        <button
+          type="button"
+          onClick={onSelect}
+          title={`${alias ? alias + '\n' : ''}${path}\nslug: ${project.slug}`}
+          className="flex min-w-0 flex-1 items-center justify-between gap-2 px-3 py-2 text-left"
+        >
+          <span className="min-w-0 flex-1 truncate">
+            {alias ? (
+              <span className="text-xs font-medium text-neutral-100">{primary}</span>
+            ) : (
+              <span className="font-mono text-xs text-neutral-300">{primary}</span>
+            )}
+          </span>
+          <span className="ml-2 inline-flex shrink-0 items-center gap-2 text-[10px] text-neutral-400">
+            <span>{project.sessionCount}</span>
+            <span>{timeAgo(project.lastActivity)}</span>
+          </span>
+        </button>
         <button
           type="button"
           onClick={startEdit}
-          className="shrink-0 rounded px-2 py-1 text-[11px] text-neutral-500 opacity-0 transition-opacity hover:text-neutral-200 group-hover:opacity-100"
+          className="shrink-0 self-stretch rounded-md px-2 text-sm text-neutral-400 hover:bg-neutral-700 hover:text-neutral-100"
           aria-label="Zmień alias projektu"
-          title="Zmień alias"
+          title="Zmień alias (alias ręczny)"
         >
           ✎
         </button>

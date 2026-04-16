@@ -9,7 +9,42 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { renderEvent } from '@/components/conversation/messages';
+import type { JsonlEvent } from '@/lib/jsonl/types';
 import { cn } from '@/lib/utils';
+
+type Category = 'user' | 'assistant' | 'tools' | 'system';
+const ALL_CATEGORIES: Category[] = ['user', 'assistant', 'tools', 'system'];
+
+function contentHasTool(content: unknown): boolean {
+  if (!Array.isArray(content)) return false;
+  for (const c of content) {
+    if (c && typeof c === 'object' && 'type' in c) {
+      const t = (c as { type: unknown }).type;
+      if (t === 'tool_use' || t === 'tool_result') return true;
+    }
+  }
+  return false;
+}
+
+function categorize(ev: JsonlEvent): Category {
+  if (ev.type === 'tool_use') return 'tools';
+  if (ev.type === 'tool_result') return 'tools';
+  if (ev.type === 'user') {
+    return contentHasTool(ev.message.content) ? 'tools' : 'user';
+  }
+  if (ev.type === 'assistant') {
+    return contentHasTool(ev.message.content) ? 'tools' : 'assistant';
+  }
+  if (ev.type === 'system' || ev.type === 'attachment') return 'system';
+  return 'system';
+}
+
+const CATEGORY_LABEL: Record<Category, string> = {
+  user: 'User',
+  assistant: 'Assistant',
+  tools: 'Tools',
+  system: 'System',
+};
 
 export function Viewer() {
   const slug = useUiStore((s) => s.selectedProjectSlug);
@@ -18,9 +53,32 @@ export function Viewer() {
   const [query, setQuery] = useState('');
   const [hitIndex, setHitIndex] = useState(0);
   const [follow, setFollow] = useState(true);
+  const [hidden, setHidden] = useState<Set<Category>>(new Set());
+  const [onlyHits, setOnlyHits] = useState(false);
   const virtuosoRef = useRef<VirtuosoHandle>(null);
 
-  const hits = useMemo(() => searchInEvents(events, query, { limit: 200 }), [events, query]);
+  const categoryCounts = useMemo(() => {
+    const counts: Record<Category, number> = { user: 0, assistant: 0, tools: 0, system: 0 };
+    for (const ev of events) counts[categorize(ev)]++;
+    return counts;
+  }, [events]);
+
+  // Hit-set used both for navigation and for "only hits" mode.
+  const hits = useMemo(() => searchInEvents(events, query, { limit: 500 }), [events, query]);
+  const hitEventIndexSet = useMemo(() => new Set(hits.map((h) => h.eventIndex)), [hits]);
+
+  // Filter events (kept as pairs so navigation can still hop into filtered list).
+  const visibleEvents = useMemo(() => {
+    const out: { ev: JsonlEvent; origIndex: number }[] = [];
+    for (let i = 0; i < events.length; i++) {
+      const ev = events[i];
+      if (!ev) continue;
+      if (hidden.has(categorize(ev))) continue;
+      if (onlyHits && query && !hitEventIndexSet.has(i)) continue;
+      out.push({ ev, origIndex: i });
+    }
+    return out;
+  }, [events, hidden, onlyHits, query, hitEventIndexSet]);
 
   if (!sessionId) {
     return (
@@ -30,12 +88,26 @@ export function Viewer() {
     );
   }
 
+  const toggleCategory = (c: Category) => {
+    setHidden((prev) => {
+      const next = new Set(prev);
+      if (next.has(c)) next.delete(c);
+      else next.add(c);
+      return next;
+    });
+  };
+
   const goToHit = (nextIdx: number) => {
     if (hits.length === 0) return;
     const idx = ((nextIdx % hits.length) + hits.length) % hits.length;
     setHitIndex(idx);
     const hit = hits[idx];
-    if (hit) virtuosoRef.current?.scrollToIndex({ index: hit.eventIndex, align: 'center' });
+    if (!hit) return;
+    // Translate original event index to position in the (possibly filtered) list.
+    const visibleIdx = visibleEvents.findIndex((v) => v.origIndex === hit.eventIndex);
+    if (visibleIdx >= 0) {
+      virtuosoRef.current?.scrollToIndex({ index: visibleIdx, align: 'center' });
+    }
   };
 
   return (
@@ -63,6 +135,7 @@ export function Viewer() {
           variant="ghost"
           onClick={() => goToHit(hitIndex - 1)}
           disabled={hits.length === 0}
+          title="Poprzednie trafienie"
         >
           ↑
         </Button>
@@ -71,8 +144,18 @@ export function Viewer() {
           variant="ghost"
           onClick={() => goToHit(hitIndex + 1)}
           disabled={hits.length === 0}
+          title="Następne trafienie"
         >
           ↓
+        </Button>
+        <Button
+          size="sm"
+          variant={onlyHits ? 'secondary' : 'ghost'}
+          onClick={() => setOnlyHits((v) => !v)}
+          disabled={!query}
+          title="Pokazuj tylko wiadomości z trafieniem"
+        >
+          tylko ▾
         </Button>
         <Button
           size="sm"
@@ -83,8 +166,39 @@ export function Viewer() {
         >
           {follow ? 'Follow: on' : 'Follow: off'}
         </Button>
-        <span className="text-[10px] text-neutral-500">
-          {events.length} · {(bytes / 1024).toFixed(1)} KB {loading && !done && '…'}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 border-b border-neutral-800 bg-neutral-950 px-4 py-2 text-[11px]">
+        {ALL_CATEGORIES.map((c) => {
+          const active = !hidden.has(c);
+          return (
+            <button
+              key={c}
+              type="button"
+              onClick={() => toggleCategory(c)}
+              className={cn(
+                'inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 transition-colors',
+                active
+                  ? 'border-neutral-600 bg-neutral-800 text-neutral-100'
+                  : 'border-neutral-800 bg-neutral-950 text-neutral-500 hover:text-neutral-300',
+              )}
+              aria-pressed={active}
+            >
+              <span>{CATEGORY_LABEL[c]}</span>
+              <span
+                className={cn(
+                  'rounded-full px-1 font-mono text-[10px]',
+                  active ? 'bg-neutral-700 text-neutral-200' : 'bg-neutral-800 text-neutral-500',
+                )}
+              >
+                {categoryCounts[c]}
+              </span>
+            </button>
+          );
+        })}
+        <span className="ml-auto text-[10px] text-neutral-500">
+          {visibleEvents.length}/{events.length} · {(bytes / 1024).toFixed(1)} KB{' '}
+          {loading && !done && '…'}
         </span>
       </div>
 
@@ -101,14 +215,20 @@ export function Viewer() {
               <Skeleton key={i} className="h-16 w-full" />
             ))}
           </div>
+        ) : visibleEvents.length === 0 ? (
+          <div className="flex h-full items-center justify-center p-8 text-sm text-neutral-500">
+            Żadne zdarzenie nie pasuje do filtrów.
+          </div>
         ) : (
           <Virtuoso
             ref={virtuosoRef}
             className={cn('h-full')}
-            data={events}
+            data={visibleEvents}
             followOutput={follow ? 'smooth' : false}
             atBottomThreshold={120}
-            itemContent={(index, ev) => <div className="px-4 py-1.5">{renderEvent(ev, index)}</div>}
+            itemContent={(index, pair) => (
+              <div className="px-4 py-1.5">{renderEvent(pair.ev, pair.origIndex)}</div>
+            )}
           />
         )}
       </div>
