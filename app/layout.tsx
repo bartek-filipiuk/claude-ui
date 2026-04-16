@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import { headers } from 'next/headers';
-import { generateNonce, makeCsp } from '@/lib/security/csp';
+import { Providers } from '@/components/providers';
 import './globals.css';
 
 export const dynamic = 'force-dynamic';
@@ -13,17 +13,17 @@ export const metadata: Metadata = {
 };
 
 export default async function RootLayout({ children }: { children: ReactNode }) {
+  // Nonce is injected by the custom server middleware on the request headers.
+  // We only need to read it — response CSP is already set there. No meta tag
+  // needed (meta CSP is weaker anyway).
   const headersList = await headers();
-  const existingNonce = headersList.get('x-csp-nonce');
-  const nonce = existingNonce ?? generateNonce();
-  const csp = makeCsp(nonce);
+  void headersList.get('x-nonce');
 
   return (
-    <html lang="en">
-      <head>
-        <meta httpEquiv="Content-Security-Policy" content={csp} />
-      </head>
-      <body className="bg-neutral-950 text-neutral-100 antialiased">{children}</body>
+    <html lang="en" className="dark">
+      <body className="bg-neutral-950 text-neutral-100 antialiased">
+        <Providers>{children}</Providers>
+      </body>
     </html>
   );
 }

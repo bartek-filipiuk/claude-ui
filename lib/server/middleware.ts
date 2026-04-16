@@ -83,5 +83,7 @@ export function runMiddleware(req: IncomingMessage, res: ServerResponse): boolea
     }
   }
 
+  // CSP nonce propagation happens in Next's edge middleware.ts — it's the only
+  // place Next auto-injects the nonce into its own inline/preload scripts.
   return false;
 }

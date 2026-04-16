@@ -2,14 +2,24 @@ import { defineConfig } from 'vitest/config';
 import { resolve } from 'node:path';
 
 export default defineConfig({
+  esbuild: {
+    jsx: 'automatic',
+  },
   resolve: {
     alias: {
       '@': resolve(__dirname, '.'),
     },
   },
   test: {
-    environment: 'node',
-    include: ['tests/unit/**/*.test.ts', 'tests/integration/**/*.test.ts'],
+    environmentMatchGlobs: [
+      ['tests/unit/components/**', 'jsdom'],
+      ['**', 'node'],
+    ],
+    include: [
+      'tests/unit/**/*.test.ts',
+      'tests/unit/**/*.test.tsx',
+      'tests/integration/**/*.test.ts',
+    ],
     exclude: ['tests/e2e/**', 'tests/security/**', 'node_modules/**', '.next/**'],
     globals: false,
     testTimeout: 10_000,

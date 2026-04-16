@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { generateNonce, makeCsp } from '@/lib/security/csp';
+import { makeCsp } from '@/lib/security/csp';
+import { generateNonce } from '@/lib/security/nonce';
 
 describe('generateNonce', () => {
   it('zwraca base64 string min 22 znaków (16 bajtów)', () => {

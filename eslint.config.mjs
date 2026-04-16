@@ -33,7 +33,7 @@ const config = [
     },
   },
   {
-    ignores: ['.next/**', 'node_modules/**', 'dist/**', 'playwright-report/**'],
+    ignores: ['.next/**', 'node_modules/**', 'dist/**', 'playwright-report/**', 'next-env.d.ts'],
   },
 ];
 

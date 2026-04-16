@@ -37,13 +37,7 @@ describe('GET /api/projects', () => {
     const body = (await res.json()) as { projects: Array<{ slug: string }> };
     expect(body.projects).toHaveLength(5);
     const slugs = body.projects.map((p) => p.slug).sort();
-    expect(slugs).toEqual([
-      '-tmp-alpha',
-      '-tmp-beta',
-      '-tmp-delta',
-      '-tmp-epsilon',
-      '-tmp-gamma',
-    ]);
+    expect(slugs).toEqual(['-tmp-alpha', '-tmp-beta', '-tmp-delta', '-tmp-epsilon', '-tmp-gamma']);
   });
 
   it('response Cache-Control: no-store', async () => {

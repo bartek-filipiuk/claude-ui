@@ -92,16 +92,15 @@ test('placeholder strona widoczna po auth', async ({ page, context }) => {
   const hasAuth = cookies.some((c) => c.name === 'claude_ui_auth');
   expect(hasAuth).toBe(true);
 
-  await page.goto(`http://127.0.0.1:${port}/`);
+  const resp = await page.goto(`http://127.0.0.1:${port}/`);
   await expect(page.getByRole('heading', { name: 'claude-ui' })).toBeVisible();
 
-  // CSP obecny w meta (lub headers).
-  const metaCsp = await page
-    .locator('meta[http-equiv="Content-Security-Policy"]')
-    .getAttribute('content');
-  expect(metaCsp).toMatch(/script-src/);
-  const scriptSrcLine = metaCsp?.match(/script-src[^;]*/)?.[0] ?? '';
+  // CSP w response header — ustawiany per-request przez middleware.
+  const csp = resp?.headers()['content-security-policy'] ?? '';
+  expect(csp).toMatch(/script-src/);
+  const scriptSrcLine = csp.match(/script-src[^;]*/)?.[0] ?? '';
   expect(scriptSrcLine).not.toContain('unsafe-inline');
+  expect(csp).toContain("object-src 'none'");
 });
 
 test('Host: evil.com → 403', async ({ request: apiReq }) => {
