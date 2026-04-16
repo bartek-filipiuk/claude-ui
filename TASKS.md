@@ -112,7 +112,7 @@ next `[ ]`. Never reorder or delete tasks — only check them off.
 
 ### T08 — Settings modal (fonts + density + theme)
 
-- [ ] **Goal:** single Settings dialog (gear icon top-right of sidebar
+- [x] **Goal:** single Settings dialog (gear icon top-right of sidebar
   header), writes `~/.claude/claude-ui/settings.json` (mode 0600 via
   new `lib/settings/io.ts`, atomic write).
 - **Options:**
