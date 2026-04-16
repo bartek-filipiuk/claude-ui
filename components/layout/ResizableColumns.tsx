@@ -1,0 +1,180 @@
+'use client';
+
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent as RKeyboardEvent,
+  type PointerEvent as RPointerEvent,
+  type ReactNode,
+} from 'react';
+
+export const LAYOUT_STORAGE_KEY = 'claude-ui:layout';
+export const MIN_SIDEBAR = 200;
+export const MIN_SESSIONS = 240;
+export const MIN_VIEWER = 400;
+export const DEFAULT_SIDEBAR = 320;
+export const DEFAULT_SESSIONS = 320;
+const KEY_STEP = 16;
+const SPLITTER_PX = 4;
+
+export interface LayoutWidths {
+  sidebar: number;
+  sessions: number;
+}
+
+export function clampWidths(w: LayoutWidths, viewport: number): LayoutWidths {
+  const splitters = SPLITTER_PX * 2;
+  const maxSidebar = Math.max(MIN_SIDEBAR, viewport - splitters - MIN_SESSIONS - MIN_VIEWER);
+  const sidebar = Math.min(Math.max(MIN_SIDEBAR, w.sidebar), maxSidebar);
+  const maxSessions = Math.max(MIN_SESSIONS, viewport - splitters - sidebar - MIN_VIEWER);
+  const sessions = Math.min(Math.max(MIN_SESSIONS, w.sessions), maxSessions);
+  return { sidebar, sessions };
+}
+
+export function loadWidths(): LayoutWidths {
+  const defaults: LayoutWidths = { sidebar: DEFAULT_SIDEBAR, sessions: DEFAULT_SESSIONS };
+  if (typeof window === 'undefined') return defaults;
+  try {
+    const raw = window.localStorage.getItem(LAYOUT_STORAGE_KEY);
+    if (!raw) return defaults;
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== 'object') return defaults;
+    const s = Number((parsed as { sidebar?: unknown }).sidebar);
+    const se = Number((parsed as { sessions?: unknown }).sessions);
+    if (!Number.isFinite(s) || !Number.isFinite(se)) return defaults;
+    return { sidebar: s, sessions: se };
+  } catch {
+    return defaults;
+  }
+}
+
+function saveWidths(w: LayoutWidths): void {
+  try {
+    window.localStorage.setItem(LAYOUT_STORAGE_KEY, JSON.stringify(w));
+  } catch {
+    // swallow quota / access errors
+  }
+}
+
+interface ResizableColumnsProps {
+  sidebar: ReactNode;
+  sessions: ReactNode;
+  viewer: ReactNode;
+}
+
+export function ResizableColumns({ sidebar, sessions, viewer }: ResizableColumnsProps) {
+  const [widths, setWidths] = useState<LayoutWidths>({
+    sidebar: DEFAULT_SIDEBAR,
+    sessions: DEFAULT_SESSIONS,
+  });
+  const [hydrated, setHydrated] = useState(false);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const rawVp = containerRef.current?.clientWidth ?? 0;
+    const vp = rawVp > 0 ? rawVp : window.innerWidth;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- hydrate localStorage post-mount to avoid SSR/CSR mismatch
+    setWidths(clampWidths(loadWidths(), vp));
+    setHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    saveWidths(widths);
+  }, [widths, hydrated]);
+
+  const viewport = useCallback(() => {
+    const raw = containerRef.current?.clientWidth ?? 0;
+    if (raw > 0) return raw;
+    return typeof window === 'undefined' ? 1600 : window.innerWidth;
+  }, []);
+
+  const startDrag = useCallback(
+    (which: keyof LayoutWidths) => (e: RPointerEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      const startX = e.clientX;
+      const startSidebar = widths.sidebar;
+      const startSessions = widths.sessions;
+      const vp = viewport();
+      const onMove = (ev: PointerEvent) => {
+        const dx = ev.clientX - startX;
+        const next: LayoutWidths =
+          which === 'sidebar'
+            ? { sidebar: startSidebar + dx, sessions: startSessions }
+            : { sidebar: startSidebar, sessions: startSessions + dx };
+        setWidths(clampWidths(next, vp));
+      };
+      const onUp = () => {
+        window.removeEventListener('pointermove', onMove);
+        window.removeEventListener('pointerup', onUp);
+      };
+      window.addEventListener('pointermove', onMove);
+      window.addEventListener('pointerup', onUp);
+    },
+    [widths, viewport],
+  );
+
+  const onKey = useCallback(
+    (which: keyof LayoutWidths) => (e: RKeyboardEvent<HTMLDivElement>) => {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      e.preventDefault();
+      const delta = e.key === 'ArrowLeft' ? -KEY_STEP : KEY_STEP;
+      setWidths((prev) =>
+        clampWidths(
+          which === 'sidebar'
+            ? { sidebar: prev.sidebar + delta, sessions: prev.sessions }
+            : { sidebar: prev.sidebar, sessions: prev.sessions + delta },
+          viewport(),
+        ),
+      );
+    },
+    [viewport],
+  );
+
+  const onDoubleClick = useCallback(() => {
+    setWidths(clampWidths({ sidebar: DEFAULT_SIDEBAR, sessions: DEFAULT_SESSIONS }, viewport()));
+  }, [viewport]);
+
+  const gridTemplate = `${widths.sidebar}px ${SPLITTER_PX}px ${widths.sessions}px ${SPLITTER_PX}px minmax(0, 1fr)`;
+
+  return (
+    <div
+      ref={containerRef}
+      className="grid h-screen bg-neutral-950 text-neutral-100"
+      style={{ gridTemplateColumns: gridTemplate }}
+      data-testid="resizable-columns"
+    >
+      {sidebar}
+      <div
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Zmień szerokość bocznego panelu"
+        aria-valuemin={MIN_SIDEBAR}
+        aria-valuenow={widths.sidebar}
+        tabIndex={0}
+        onPointerDown={startDrag('sidebar')}
+        onDoubleClick={onDoubleClick}
+        onKeyDown={onKey('sidebar')}
+        data-testid="splitter-sidebar"
+        className="cursor-col-resize touch-none border-l border-r border-neutral-800 bg-neutral-800 transition-colors hover:bg-neutral-700 focus:bg-blue-500 focus:outline-none"
+      />
+      {sessions}
+      <div
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Zmień szerokość listy sesji"
+        aria-valuemin={MIN_SESSIONS}
+        aria-valuenow={widths.sessions}
+        tabIndex={0}
+        onPointerDown={startDrag('sessions')}
+        onDoubleClick={onDoubleClick}
+        onKeyDown={onKey('sessions')}
+        data-testid="splitter-sessions"
+        className="cursor-col-resize touch-none border-l border-r border-neutral-800 bg-neutral-800 transition-colors hover:bg-neutral-700 focus:bg-blue-500 focus:outline-none"
+      />
+      {viewer}
+    </div>
+  );
+}
