@@ -6,11 +6,14 @@ interface UiState {
   search: string;
   terminalOpen: boolean;
   terminalCwd: string | null;
+  editorOpen: boolean;
   setSelectedProject: (slug: string | null) => void;
   setSelectedSession: (id: string | null) => void;
   setSearch: (q: string) => void;
   openTerminal: (cwd: string) => void;
   closeTerminal: () => void;
+  openEditor: () => void;
+  closeEditor: () => void;
 }
 
 export const useUiStore = create<UiState>((set) => ({
@@ -19,14 +22,18 @@ export const useUiStore = create<UiState>((set) => ({
   search: '',
   terminalOpen: false,
   terminalCwd: null,
+  editorOpen: false,
   setSelectedProject: (slug) =>
     set(() => ({
       selectedProjectSlug: slug,
       selectedSessionId: null,
       terminalOpen: false,
+      editorOpen: false,
     })),
   setSelectedSession: (id) => set({ selectedSessionId: id }),
   setSearch: (q) => set({ search: q }),
-  openTerminal: (cwd) => set({ terminalOpen: true, terminalCwd: cwd }),
+  openTerminal: (cwd) => set({ terminalOpen: true, terminalCwd: cwd, editorOpen: false }),
   closeTerminal: () => set({ terminalOpen: false, terminalCwd: null }),
+  openEditor: () => set({ editorOpen: true, terminalOpen: false }),
+  closeEditor: () => set({ editorOpen: false }),
 }));
