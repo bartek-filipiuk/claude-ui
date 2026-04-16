@@ -41,6 +41,7 @@ export function useSetAlias() {
     },
     onSuccess: (data) => {
       qc.setQueryData(['aliases'], data);
+      qc.invalidateQueries({ queryKey: ['project-meta'] });
     },
   });
 }

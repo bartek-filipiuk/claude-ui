@@ -1,8 +1,13 @@
 'use client';
 
 import { useMemo } from 'react';
+import { Star } from 'lucide-react';
 import { useProjects, type ProjectSummary } from '@/hooks/use-projects';
-import { useAliases } from '@/hooks/use-aliases';
+import {
+  useProjectMeta,
+  useSetProjectMeta,
+  type ProjectMetaMap,
+} from '@/hooks/use-project-meta';
 import { useUiStore } from '@/stores/ui-slice';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -12,25 +17,16 @@ import { cn } from '@/lib/utils';
 
 export function ProjectList() {
   const { data, isLoading, isError, refetch } = useProjects();
-  const { data: aliases } = useAliases();
+  const { data: meta } = useProjectMeta();
+  const setMeta = useSetProjectMeta();
   const search = useUiStore((s) => s.search);
   const selectedSlug = useUiStore((s) => s.selectedProjectSlug);
   const setSelected = useUiStore((s) => s.setSelectedProject);
 
-  const filtered = useMemo(() => {
-    const list = data ?? [];
-    const q = search.trim().toLowerCase();
-    if (!q) return list;
-    return list.filter((p) => {
-      const alias = aliases?.[p.slug] ?? '';
-      return (
-        alias.toLowerCase().includes(q) ||
-        p.slug.toLowerCase().includes(q) ||
-        (p.displayPath ?? '').toLowerCase().includes(q) ||
-        (p.resolvedCwd ?? '').toLowerCase().includes(q)
-      );
-    });
-  }, [data, search, aliases]);
+  const visible = useMemo(
+    () => filterAndSortProjects(data ?? [], meta ?? {}, search),
+    [data, meta, search],
+  );
 
   if (isLoading) return <LoadingState />;
   if (isError) return <ErrorState onRetry={() => refetch()} />;
@@ -39,16 +35,26 @@ export function ProjectList() {
   return (
     <ScrollArea className="h-full">
       <ul className="flex flex-col gap-0.5 p-2" role="list">
-        {filtered.map((p) => (
-          <ProjectItem
-            key={p.slug}
-            project={p}
-            alias={aliases?.[p.slug]}
-            active={p.slug === selectedSlug}
-            onSelect={() => setSelected(p.slug)}
-          />
-        ))}
-        {filtered.length === 0 && (
+        {visible.map((p) => {
+          const entry = meta?.[p.slug];
+          return (
+            <ProjectItem
+              key={p.slug}
+              project={p}
+              alias={entry?.alias}
+              favorite={entry?.favorite === true}
+              active={p.slug === selectedSlug}
+              onSelect={() => setSelected(p.slug)}
+              onToggleFavorite={() => {
+                setMeta.mutate({
+                  slug: p.slug,
+                  favorite: entry?.favorite !== true,
+                });
+              }}
+            />
+          );
+        })}
+        {visible.length === 0 && (
           <li className="px-3 py-6 text-center text-xs text-neutral-500">Brak dopasowań.</li>
         )}
       </ul>
@@ -56,29 +62,84 @@ export function ProjectList() {
   );
 }
 
+export function filterAndSortProjects(
+  projects: ProjectSummary[],
+  meta: ProjectMetaMap,
+  search: string,
+): ProjectSummary[] {
+  const q = search.trim().toLowerCase();
+  const filtered = q
+    ? projects.filter((p) => {
+        const alias = meta[p.slug]?.alias ?? '';
+        return (
+          alias.toLowerCase().includes(q) ||
+          p.slug.toLowerCase().includes(q) ||
+          (p.displayPath ?? '').toLowerCase().includes(q) ||
+          (p.resolvedCwd ?? '').toLowerCase().includes(q)
+        );
+      })
+    : projects.slice();
+  filtered.sort((a, b) => {
+    const aFav = meta[a.slug]?.favorite === true ? 1 : 0;
+    const bFav = meta[b.slug]?.favorite === true ? 1 : 0;
+    if (aFav !== bFav) return bFav - aFav;
+    const aTs = a.lastActivity ? Date.parse(a.lastActivity) : 0;
+    const bTs = b.lastActivity ? Date.parse(b.lastActivity) : 0;
+    return bTs - aTs;
+  });
+  return filtered;
+}
+
 function ProjectItem({
   project,
   alias,
+  favorite,
   active,
   onSelect,
+  onToggleFavorite,
 }: {
   project: ProjectSummary;
   alias: string | undefined;
+  favorite: boolean;
   active: boolean;
   onSelect: () => void;
+  onToggleFavorite: () => void;
 }) {
   const path = project.resolvedCwd ?? project.displayPath;
   const primary = alias ?? path;
   return (
-    <li>
+    <li
+      className={cn(
+        'flex min-w-0 items-center gap-1 rounded-md pr-1',
+        active ? 'bg-neutral-800' : 'hover:bg-neutral-900',
+      )}
+    >
+      <button
+        type="button"
+        aria-label={favorite ? 'Odepnij projekt' : 'Przypnij projekt'}
+        aria-pressed={favorite}
+        onClick={(e) => {
+          e.stopPropagation();
+          onToggleFavorite();
+        }}
+        className={cn(
+          'flex h-6 w-6 shrink-0 items-center justify-center rounded text-neutral-500 hover:text-yellow-300',
+          favorite && 'text-yellow-300',
+        )}
+        title={favorite ? 'Odepnij projekt' : 'Przypnij projekt'}
+      >
+        <Star
+          aria-hidden
+          className="h-3.5 w-3.5"
+          fill={favorite ? 'currentColor' : 'none'}
+          strokeWidth={1.75}
+        />
+      </button>
       <button
         type="button"
         onClick={onSelect}
         title={`${alias ? alias + '\n' : ''}${path}\nslug: ${project.slug}`}
-        className={cn(
-          'flex w-full min-w-0 items-center justify-between gap-2 rounded-md px-3 py-2 text-left',
-          active ? 'bg-neutral-800' : 'hover:bg-neutral-900',
-        )}
+        className="flex min-w-0 flex-1 items-center justify-between gap-2 py-2 pl-1 pr-2 text-left"
       >
         <span className="min-w-0 flex-1 truncate">
           {alias ? (
