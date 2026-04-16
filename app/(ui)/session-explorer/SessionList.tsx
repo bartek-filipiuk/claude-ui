@@ -83,9 +83,7 @@ export function SessionList() {
             session={s}
             active={s.id === selectedId}
             onSelect={() => setSelected(s.id)}
-            onOpenTerminal={() =>
-              openSession.mutate({ slug, resumeSessionId: s.id })
-            }
+            onOpenTerminal={() => openSession.mutate({ slug, resumeSessionId: s.id })}
             openPending={openSession.isPending}
           />
         ))}

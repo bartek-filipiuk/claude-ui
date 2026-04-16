@@ -26,13 +26,14 @@ export function TabManager() {
       {tabs.map((t) => (
         <div
           key={t.id}
-          className={cn(
-            'absolute inset-0',
-            t.id === activeId ? 'visible z-10' : 'invisible z-0',
-          )}
+          className={cn('absolute inset-0', t.id === activeId ? 'visible z-10' : 'invisible z-0')}
           aria-hidden={t.id !== activeId}
         >
-          <Terminal cwd={t.cwd} {...(t.shell ? { shell: t.shell } : {})} {...(t.args ? { args: t.args } : {})} />
+          <Terminal
+            cwd={t.cwd}
+            {...(t.shell ? { shell: t.shell } : {})}
+            {...(t.args ? { args: t.args } : {})}
+          />
         </div>
       ))}
     </div>

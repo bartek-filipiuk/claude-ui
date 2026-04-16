@@ -62,11 +62,7 @@ export function MainPanel() {
             </Button>
           ) : (
             tabs.length > 0 && (
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => openTerminal(tabs[0]?.cwd ?? '/')}
-              >
+              <Button size="sm" variant="ghost" onClick={() => openTerminal(tabs[0]?.cwd ?? '/')}>
                 Pokaż terminal ({tabs.length})
               </Button>
             )

@@ -6,12 +6,12 @@ import { logger } from '@/lib/server/logger';
 import { runMiddleware } from '@/lib/server/middleware';
 import { attachUpgradeRouter } from '@/lib/ws/server';
 import { ptyManager } from '@/lib/pty/manager';
+import { projectsWatcher } from '@/lib/watcher/chokidar';
 
 const dev = process.env['NODE_ENV'] !== 'production';
 
 async function main(): Promise<void> {
   const port = getServerPort();
-  // Force early throw if token missing, before binding.
   getServerToken();
 
   const app = next({ dev, hostname: '127.0.0.1', port });
@@ -45,6 +45,7 @@ async function main(): Promise<void> {
   const shutdown = (signal: string) => {
     logger.info({ signal }, 'shutting_down');
     ptyManager.killAll('SIGTERM');
+    void projectsWatcher.stop();
     httpServer.close(() => process.exit(0));
     setTimeout(() => process.exit(1), 10_000).unref();
   };

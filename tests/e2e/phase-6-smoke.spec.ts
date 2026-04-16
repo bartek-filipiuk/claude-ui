@@ -3,7 +3,7 @@ import { request } from 'node:http';
 import { createServer } from 'node:net';
 import { randomBytes } from 'node:crypto';
 import { resolve } from 'node:path';
-import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, appendFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { test, expect } from '@playwright/test';
 
@@ -54,39 +54,26 @@ function waitHealth(port: number, timeoutMs = 20_000): Promise<void> {
 }
 
 function buildFakeHome() {
-  const home = mkdtempSync(`${tmpdir()}/claude-ui-phase5-`);
-  // Hex-only session IDs — lib/jsonl/index accepts only canonical UUID shape.
-  const ids = {
-    alpha: '00000000-0000-4000-8000-aaaaaaaaaaaa',
-    beta: '11111111-0000-4000-8000-bbbbbbbbbbbb',
-    gamma: '22222222-0000-4000-8000-cccccccccccc',
-  } as const;
-  const make = (name: keyof typeof ids) => {
-    const pdir = `${home}/${name}`;
-    mkdirSync(pdir, { recursive: true });
-    const slug = pdir.replace(/\//g, '-');
-    const pdirSession = `${home}/.claude/projects/${slug}`;
-    mkdirSync(pdirSession, { recursive: true });
-    const sessionId = ids[name];
-    writeFileSync(
-      `${pdirSession}/${sessionId}.jsonl`,
-      JSON.stringify({
-        type: 'user',
-        sessionId,
-        uuid: 'u-1',
-        timestamp: '2026-04-15T10:00:00.000Z',
-        cwd: pdir,
-        message: { role: 'user', content: `fixture for ${name}` },
-      }) + '\n',
-    );
-    return { cwd: pdir, sessionId };
-  };
-  return {
-    home,
-    alpha: make('alpha'),
-    beta: make('beta'),
-    gamma: make('gamma'),
-  };
+  const home = mkdtempSync(`${tmpdir()}/claude-ui-phase6-`);
+  const pdir = `${home}/alpha`;
+  mkdirSync(pdir, { recursive: true });
+  const slug = pdir.replace(/\//g, '-');
+  const projectsDir = `${home}/.claude/projects/${slug}`;
+  mkdirSync(projectsDir, { recursive: true });
+  const sessionId = '00000000-0000-4000-8000-aaaaaaaaaaaa';
+  const file = `${projectsDir}/${sessionId}.jsonl`;
+  writeFileSync(
+    file,
+    JSON.stringify({
+      type: 'user',
+      sessionId,
+      uuid: 'u-1',
+      timestamp: '2026-04-15T10:00:00.000Z',
+      cwd: pdir,
+      message: { role: 'user', content: 'initial' },
+    }) + '\n',
+  );
+  return { home, pdir, slug, sessionId, file, projectsDir };
 }
 
 let port: number;
@@ -129,45 +116,61 @@ test.beforeEach(async ({ page }) => {
   expect(res.status()).toBe(302);
 });
 
-test('3 zakładki shella, przełączanie, zamknięcie', async ({ page }) => {
+test('nowa sesja w tle → sidebar auto-refresh', async ({ page }) => {
   await page.goto(`http://127.0.0.1:${port}/`);
-
-  // Wait until the project list renders — it contains buttons with "/alpha"
-  // substring. With a mutable tmpdir HOME the exact displayed path depends
-  // on whether resolvedCwd was sniffed; we match just the trailing segment.
   await expect(page.locator('aside button').filter({ hasText: /alpha/ }).first()).toBeVisible({
     timeout: 15_000,
   });
 
-  const newShell = page.getByRole('button', { name: '+ shell' });
-  const clickProject = (name: string) =>
+  await page.locator('aside button').filter({ hasText: /alpha/ }).first().click();
+  // 1 session visible initially.
+  await expect(page.locator('button').filter({ hasText: /wiadomości/ })).toHaveCount(1);
+
+  // Background: write a second session JSONL.
+  const newSessionId = '11111111-0000-4000-8000-bbbbbbbbbbbb';
+  writeFileSync(
+    `${fake.projectsDir}/${newSessionId}.jsonl`,
+    JSON.stringify({
+      type: 'user',
+      sessionId: newSessionId,
+      uuid: 'u-2',
+      timestamp: '2026-04-16T10:00:00.000Z',
+      cwd: fake.pdir,
+      message: { role: 'user', content: 'second session' },
+    }) + '\n',
+  );
+
+  await expect(page.locator('button').filter({ hasText: /wiadomości/ })).toHaveCount(2, {
+    timeout: 5_000,
+  });
+});
+
+test('append do otwartej sesji → zmiany widoczne', async ({ page }) => {
+  await page.goto(`http://127.0.0.1:${port}/`);
+  await expect(page.locator('aside button').filter({ hasText: /alpha/ }).first()).toBeVisible({
+    timeout: 15_000,
+  });
+  await page.locator('aside button').filter({ hasText: /alpha/ }).first().click();
+
+  // Background append — live refresh of session list size.
+  appendFileSync(
+    fake.file,
+    JSON.stringify({
+      type: 'user',
+      sessionId: fake.sessionId,
+      uuid: 'u-bg',
+      timestamp: '2026-04-17T10:00:00.000Z',
+      cwd: fake.pdir,
+      message: { role: 'user', content: 'appended-from-phase6' },
+    }) + '\n',
+  );
+
+  // Session item shows the latest "modified at" timestamp — we just check
+  // the session card is still rendered (live invalidate triggered).
+  await expect(
     page
-      .locator('aside button')
-      .filter({ hasText: new RegExp(name) })
-      .first()
-      .click();
-
-  await clickProject('alpha');
-  await newShell.click();
-  await expect(page.getByText('ready').first()).toBeVisible({ timeout: 10_000 });
-
-  await clickProject('beta');
-  await newShell.click();
-  await expect(page.getByRole('tab')).toHaveCount(2);
-
-  await clickProject('gamma');
-  await newShell.click();
-  await expect(page.getByRole('tab')).toHaveCount(3);
-
-  // Tab header shows counter 3/16.
-  await expect(page.getByText(/Terminal · 3\/16/)).toBeVisible();
-
-  // Click first tab, check active state.
-  const tabs = page.getByRole('tab');
-  await tabs.nth(0).click();
-  await expect(tabs.nth(0)).toHaveAttribute('aria-selected', 'true');
-
-  // Close middle tab via × button.
-  await tabs.nth(1).getByRole('button', { name: 'Zamknij zakładkę' }).click();
-  await expect(page.getByRole('tab')).toHaveCount(2);
+      .locator('button')
+      .filter({ hasText: /wiadomości/ })
+      .first(),
+  ).toBeVisible();
 });

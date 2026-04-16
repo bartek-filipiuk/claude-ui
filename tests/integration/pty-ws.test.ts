@@ -44,7 +44,11 @@ function openWs(headers: Record<string, string>): Promise<WebSocket> {
   });
 }
 
-async function waitMessage(ws: WebSocket, predicate: (m: Record<string, unknown>) => boolean, timeoutMs = 5000): Promise<Record<string, unknown>> {
+async function waitMessage(
+  ws: WebSocket,
+  predicate: (m: Record<string, unknown>) => boolean,
+  timeoutMs = 5000,
+): Promise<Record<string, unknown>> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error('timeout')), timeoutMs);
     const handler = (buf: WebSocket.RawData) => {

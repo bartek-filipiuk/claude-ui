@@ -91,19 +91,9 @@ test.beforeEach(async ({ page }) => {
 });
 
 test('widzę 5 projektów z fixture', async ({ page }) => {
-  const consoleMsgs: string[] = [];
-  page.on('console', (m) => consoleMsgs.push(`${m.type()}: ${m.text()}`));
-  page.on('pageerror', (e) => consoleMsgs.push(`pageerror: ${e.message}`));
-  page.on('requestfailed', (r) =>
-    consoleMsgs.push(`reqfail: ${r.url()} ${r.failure()?.errorText}`),
-  );
   await page.goto(`http://127.0.0.1:${port}/`);
-  try {
-    await expect(page.getByText('/tmp/alpha')).toBeVisible({ timeout: 10_000 });
-  } catch (err) {
-    console.error('CONSOLE LOG DUMP:\n' + consoleMsgs.join('\n'));
-    throw err;
-  }
+  // Dev-mode first-compile can take a while — 20s accommodates slow CI.
+  await expect(page.getByText('/tmp/alpha')).toBeVisible({ timeout: 20_000 });
   await expect(page.getByText('/tmp/beta')).toBeVisible();
   await expect(page.getByText('/tmp/gamma')).toBeVisible();
   await expect(page.getByText('/tmp/delta')).toBeVisible();
