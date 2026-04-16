@@ -6,6 +6,8 @@ export interface TerminalTab {
   cwd: string;
   shell?: string;
   args?: string[];
+  /** Command to type into PTY after spawn (e.g. "claude --resume <id>"). */
+  initCommand?: string;
   title: string;
   createdAt: number;
 }
@@ -15,6 +17,7 @@ export interface TerminalCfg {
   cwd: string;
   shell?: string;
   args?: string[];
+  initCommand?: string;
   title: string;
 }
 
@@ -45,6 +48,7 @@ export const useTerminalStore = create<State>((set, get) => ({
       cwd: cfg.cwd,
       ...(cfg.shell !== undefined ? { shell: cfg.shell } : {}),
       ...(cfg.args !== undefined ? { args: cfg.args } : {}),
+      ...(cfg.initCommand !== undefined ? { initCommand: cfg.initCommand } : {}),
       title: cfg.title,
       createdAt: Date.now(),
     };

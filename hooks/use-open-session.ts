@@ -49,14 +49,20 @@ export function useOpenSession() {
       return (await res.json()) as SessionNewResp;
     },
     onSuccess: (data, vars) => {
+      // Spawn the user's default shell (PTY manager falls back to /bin/bash
+      // when shell isn't absolute). After the PTY is ready, Terminal.tsx
+      // types the init command into stdin — that way `claude` resolves
+      // via $PATH with a real login environment, instead of being passed
+      // as a bogus flag to /bin/bash.
+      const initCommand = [data.command, ...data.args]
+        .map((p) => (/[\s'"\\$`]/.test(p) ? `'${p.replace(/'/g, `'\\''`)}'` : p))
+        .join(' ');
       openTab({
         projectSlug: vars.slug,
         cwd: data.cwd,
-        shell: data.command,
-        args: data.args,
+        initCommand,
         title: data.title,
       });
-      // Mark UI as terminal mode so MainPanel renders TabManager.
       openTerminalView(data.cwd);
     },
   });

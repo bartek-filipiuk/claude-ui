@@ -1,9 +1,11 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useProjects, type ProjectSummary } from '@/hooks/use-projects';
+import { useAliases, useSetAlias } from '@/hooks/use-aliases';
 import { useUiStore } from '@/stores/ui-slice';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -12,6 +14,7 @@ import { cn } from '@/lib/utils';
 
 export function ProjectList() {
   const { data, isLoading, isError, refetch } = useProjects();
+  const { data: aliases } = useAliases();
   const search = useUiStore((s) => s.search);
   const selectedSlug = useUiStore((s) => s.selectedProjectSlug);
   const setSelected = useUiStore((s) => s.setSelectedProject);
@@ -20,13 +23,16 @@ export function ProjectList() {
     const list = data ?? [];
     const q = search.trim().toLowerCase();
     if (!q) return list;
-    return list.filter(
-      (p) =>
+    return list.filter((p) => {
+      const alias = aliases?.[p.slug] ?? '';
+      return (
+        alias.toLowerCase().includes(q) ||
         p.slug.toLowerCase().includes(q) ||
         (p.displayPath ?? '').toLowerCase().includes(q) ||
-        (p.resolvedCwd ?? '').toLowerCase().includes(q),
-    );
-  }, [data, search]);
+        (p.resolvedCwd ?? '').toLowerCase().includes(q)
+      );
+    });
+  }, [data, search, aliases]);
 
   if (isLoading) return <LoadingState />;
   if (isError) return <ErrorState onRetry={() => refetch()} />;
@@ -39,6 +45,7 @@ export function ProjectList() {
           <ProjectItem
             key={p.slug}
             project={p}
+            alias={aliases?.[p.slug]}
             active={p.slug === selectedSlug}
             onSelect={() => setSelected(p.slug)}
           />
@@ -53,37 +60,116 @@ export function ProjectList() {
 
 function ProjectItem({
   project,
+  alias,
   active,
   onSelect,
 }: {
   project: ProjectSummary;
+  alias: string | undefined;
   active: boolean;
   onSelect: () => void;
 }) {
-  const label = project.resolvedCwd ?? project.displayPath;
+  const path = project.resolvedCwd ?? project.displayPath;
+  const primary = alias ?? path;
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(alias ?? '');
+  const setAlias = useSetAlias();
+
+  const startEdit = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setDraft(alias ?? '');
+    setEditing(true);
+  };
+  const commit = () => {
+    const value = draft.trim();
+    if (value === (alias ?? '')) {
+      setEditing(false);
+      return;
+    }
+    setAlias.mutate(
+      { slug: project.slug, alias: value === '' ? null : value },
+      { onSettled: () => setEditing(false) },
+    );
+  };
+
+  if (editing) {
+    return (
+      <li>
+        <div className="flex items-center gap-1 rounded-md border border-neutral-700 bg-neutral-900 px-2 py-1">
+          <Input
+            autoFocus
+            value={draft}
+            placeholder={path}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                commit();
+              } else if (e.key === 'Escape') {
+                e.preventDefault();
+                setEditing(false);
+              }
+            }}
+            className="h-7 flex-1 text-xs"
+            aria-label="Alias projektu"
+          />
+          <Button size="sm" variant="ghost" onClick={commit} disabled={setAlias.isPending}>
+            ✓
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>
+            ✕
+          </Button>
+        </div>
+      </li>
+    );
+  }
+
   return (
     <li>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            variant={active ? 'secondary' : 'ghost'}
-            onClick={onSelect}
-            className={cn('h-auto w-full justify-between px-3 py-2 text-left')}
-          >
-            <span className="min-w-0 flex-1 truncate font-mono text-xs">{label}</span>
-            <span className="ml-2 inline-flex items-center gap-2 text-[10px] text-neutral-400">
-              <span>{project.sessionCount}</span>
-              <span>{timeAgo(project.lastActivity)}</span>
-            </span>
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent side="right">
-          <div className="flex flex-col gap-0.5">
-            <span className="font-mono text-xs">{label}</span>
-            <span className="text-[10px] text-neutral-400">slug: {project.slug}</span>
-          </div>
-        </TooltipContent>
-      </Tooltip>
+      <div
+        className={cn(
+          'group flex items-center rounded-md',
+          active ? 'bg-neutral-800' : 'hover:bg-neutral-900',
+        )}
+      >
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              onClick={onSelect}
+              className="flex min-w-0 flex-1 items-center justify-between gap-2 px-3 py-2 text-left"
+            >
+              <span className="min-w-0 flex-1 truncate">
+                {alias ? (
+                  <span className="text-xs font-medium text-neutral-100">{primary}</span>
+                ) : (
+                  <span className="font-mono text-xs text-neutral-300">{primary}</span>
+                )}
+              </span>
+              <span className="ml-2 inline-flex shrink-0 items-center gap-2 text-[10px] text-neutral-400">
+                <span>{project.sessionCount}</span>
+                <span>{timeAgo(project.lastActivity)}</span>
+              </span>
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="right">
+            <div className="flex flex-col gap-0.5">
+              {alias && <span className="text-xs">{alias}</span>}
+              <span className="font-mono text-xs">{path}</span>
+              <span className="text-[10px] text-neutral-400">slug: {project.slug}</span>
+            </div>
+          </TooltipContent>
+        </Tooltip>
+        <button
+          type="button"
+          onClick={startEdit}
+          className="shrink-0 rounded px-2 py-1 text-[11px] text-neutral-500 opacity-0 transition-opacity hover:text-neutral-200 group-hover:opacity-100"
+          aria-label="Zmień alias projektu"
+          title="Zmień alias"
+        >
+          ✎
+        </button>
+      </div>
     </li>
   );
 }

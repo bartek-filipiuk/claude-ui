@@ -33,6 +33,7 @@ export function TabManager() {
             cwd={t.cwd}
             {...(t.shell ? { shell: t.shell } : {})}
             {...(t.args ? { args: t.args } : {})}
+            {...(t.initCommand ? { initCommand: t.initCommand } : {})}
           />
         </div>
       ))}

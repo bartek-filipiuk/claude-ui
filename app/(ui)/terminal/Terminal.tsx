@@ -10,22 +10,33 @@ export interface TerminalProps {
   shell?: string;
   /** Optional args (e.g. ['--resume', sessionId] for claude). */
   args?: string[];
+  /** Command typed into PTY stdin after it becomes ready. */
+  initCommand?: string;
 }
 
 const RESIZE_DEBOUNCE_MS = 100;
 
-export function Terminal({ cwd, shell, args }: TerminalProps) {
+export function Terminal({ cwd, shell, args, initCommand }: TerminalProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<import('@xterm/xterm').Terminal | null>(null);
   const fitRef = useRef<import('@xterm/addon-fit').FitAddon | null>(null);
   const resizeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const initSentRef = useRef(false);
   const [status, setStatus] = useState<PtyStatus>('closed');
   const { connect, write, resize, close } = usePty({
     onData: (chunk) => termRef.current?.write(chunk),
     onExit: ({ exitCode }) => {
       termRef.current?.write(`\r\n\x1b[33m[exit ${exitCode}]\x1b[0m\r\n`);
     },
-    onStatus: setStatus,
+    onStatus: (s) => {
+      setStatus(s);
+      // Type the init command once, the first time the PTY is ready.
+      if (s === 'ready' && initCommand && !initSentRef.current) {
+        initSentRef.current = true;
+        // Small delay so the shell's prompt renders before typing.
+        setTimeout(() => write(`${initCommand}\r`), 80);
+      }
+    },
   });
 
   // Mount xterm exactly once.

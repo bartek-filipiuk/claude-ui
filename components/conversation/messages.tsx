@@ -7,27 +7,71 @@ import { CodeBlock } from './CodeBlock';
 
 const MAX_RENDER_BYTES = 10_000_000;
 
-function extractText(content: unknown): string {
-  if (typeof content === 'string') return content;
-  if (Array.isArray(content)) {
-    return content
+/**
+ * Normalised content block. Claude Code stores `message.content` as either a
+ * plain string (legacy user messages) or an array of typed blocks. We expose
+ * each block so the renderer can show text, tool calls, and tool results
+ * inline in the order they were produced.
+ */
+type ContentBlock =
+  | { kind: 'text'; text: string }
+  | { kind: 'thinking'; text: string }
+  | { kind: 'tool_use'; name: string; input: unknown; id: string | null }
+  | { kind: 'tool_result'; text: string; toolUseId: string | null; isError: boolean };
+
+function toolResultToText(raw: unknown): { text: string; isError: boolean } {
+  // Anthropic SDK shape: { type: 'tool_result', content: string | Array<{type,text}>, is_error? }
+  let text = '';
+  if (typeof raw === 'string') text = raw;
+  else if (Array.isArray(raw)) {
+    text = raw
       .map((c) => {
-        if (
-          c &&
-          typeof c === 'object' &&
-          'text' in c &&
-          typeof (c as { text: unknown }).text === 'string'
-        ) {
-          return (c as { text: string }).text;
-        }
-        if (c && typeof c === 'object' && 'type' in c) {
-          return `[${(c as { type: string }).type}]`;
+        if (c && typeof c === 'object' && 'text' in c) {
+          return String((c as { text: unknown }).text ?? '');
         }
         return '';
       })
       .join('\n');
+  } else if (raw && typeof raw === 'object') {
+    try {
+      text = JSON.stringify(raw, null, 2);
+    } catch {
+      text = '[unserialisable]';
+    }
   }
-  return '';
+  return { text, isError: false };
+}
+
+function splitBlocks(content: unknown): ContentBlock[] {
+  if (typeof content === 'string') return [{ kind: 'text', text: content }];
+  if (!Array.isArray(content)) return [];
+  const out: ContentBlock[] = [];
+  for (const c of content) {
+    if (!c || typeof c !== 'object') continue;
+    const item = c as Record<string, unknown>;
+    const t = item['type'];
+    if (t === 'text' && typeof item['text'] === 'string') {
+      out.push({ kind: 'text', text: item['text'] as string });
+    } else if (t === 'thinking' && typeof item['thinking'] === 'string') {
+      out.push({ kind: 'thinking', text: item['thinking'] as string });
+    } else if (t === 'tool_use') {
+      out.push({
+        kind: 'tool_use',
+        name: typeof item['name'] === 'string' ? (item['name'] as string) : 'unknown',
+        input: item['input'],
+        id: typeof item['id'] === 'string' ? (item['id'] as string) : null,
+      });
+    } else if (t === 'tool_result') {
+      const { text } = toolResultToText(item['content']);
+      out.push({
+        kind: 'tool_result',
+        text,
+        toolUseId: typeof item['tool_use_id'] === 'string' ? (item['tool_use_id'] as string) : null,
+        isError: item['is_error'] === true,
+      });
+    }
+  }
+  return out;
 }
 
 function truncate(text: string): { text: string; truncated: boolean } {
@@ -56,26 +100,121 @@ function Wrapper({
   );
 }
 
+function Blocks({ blocks, markdown }: { blocks: ContentBlock[]; markdown: boolean }) {
+  return (
+    <div className="flex flex-col gap-3">
+      {blocks.map((b, i) => {
+        if (b.kind === 'text') {
+          const { text, truncated } = truncate(b.text);
+          return (
+            <div key={i}>
+              {markdown ? (
+                <Markdown text={text} />
+              ) : (
+                <pre className="whitespace-pre-wrap break-words font-mono text-sm text-neutral-100">
+                  {text}
+                </pre>
+              )}
+              {truncated && <TruncatedHint />}
+            </div>
+          );
+        }
+        if (b.kind === 'thinking') {
+          const { text, truncated } = truncate(b.text);
+          return (
+            <details
+              key={i}
+              className="rounded-md border border-neutral-800 bg-neutral-900/60 px-3 py-2 text-xs text-neutral-400"
+            >
+              <summary className="cursor-pointer select-none text-[10px] uppercase tracking-wider text-neutral-500">
+                thinking
+              </summary>
+              <pre className="mt-2 whitespace-pre-wrap break-words font-mono text-xs text-neutral-400">
+                {text}
+              </pre>
+              {truncated && <TruncatedHint />}
+            </details>
+          );
+        }
+        if (b.kind === 'tool_use') {
+          return <ToolUseBlock key={i} name={b.name} input={b.input} />;
+        }
+        return <ToolResultBlock key={i} text={b.text} isError={b.isError} />;
+      })}
+    </div>
+  );
+}
+
+function ToolUseBlock({ name, input }: { name: string; input: unknown }) {
+  const [open, setOpen] = useState(false);
+  const inputStr = input !== undefined ? JSON.stringify(input, null, 2) : '{}';
+  const oneLine = inputStr.replace(/\s+/g, ' ').slice(0, 180);
+  return (
+    <div className="rounded-md border border-amber-900/60 bg-amber-950/20">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs"
+      >
+        <span className="text-neutral-400">{open ? '▼' : '▶'}</span>
+        <span className="font-mono font-semibold text-amber-300">{name}</span>
+        {!open && <span className="truncate font-mono text-neutral-500">{oneLine}</span>}
+      </button>
+      {open && (
+        <div className="border-t border-amber-900/60 px-3 pb-3 pt-2">
+          <CodeBlock code={inputStr} lang="json" />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ToolResultBlock({ text, isError }: { text: string; isError: boolean }) {
+  const [open, setOpen] = useState(false);
+  const { text: safe, truncated } = truncate(text);
+  const oneLine = safe.replace(/\s+/g, ' ').slice(0, 180);
+  const tone = isError ? 'border-red-900/60 bg-red-950/20' : 'border-sky-900/60 bg-sky-950/10';
+  return (
+    <div className={`rounded-md border ${tone}`}>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs"
+      >
+        <span className="text-neutral-400">{open ? '▼' : '▶'}</span>
+        <span
+          className={`font-mono text-[10px] uppercase tracking-wider ${
+            isError ? 'text-red-300' : 'text-sky-300'
+          }`}
+        >
+          {isError ? 'tool_result · error' : 'tool_result'}
+        </span>
+        {!open && <span className="truncate font-mono text-neutral-500">{oneLine}</span>}
+      </button>
+      {open && (
+        <div className="border-t border-neutral-800 px-3 pb-3 pt-2">
+          <CodeBlock code={safe} lang="text" />
+          {truncated && <TruncatedHint />}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function UserMsg({ ev }: { ev: Extract<JsonlEvent, { type: 'user' }> }) {
-  const raw = extractText(ev.message.content);
-  const { text, truncated } = truncate(raw);
+  const blocks = splitBlocks(ev.message.content);
   return (
     <Wrapper role="user" color="text-blue-400">
-      <pre className="whitespace-pre-wrap break-words font-mono text-sm text-neutral-100">
-        {text}
-      </pre>
-      {truncated && <TruncatedHint />}
+      <Blocks blocks={blocks} markdown={false} />
     </Wrapper>
   );
 }
 
 export function AssistantMsg({ ev }: { ev: Extract<JsonlEvent, { type: 'assistant' }> }) {
-  const raw = extractText(ev.message.content);
-  const { text, truncated } = truncate(raw);
+  const blocks = splitBlocks(ev.message.content);
   return (
     <Wrapper role="assistant" color="text-emerald-400">
-      <Markdown text={text} />
-      {truncated && <TruncatedHint />}
+      <Blocks blocks={blocks} markdown={true} />
     </Wrapper>
   );
 }

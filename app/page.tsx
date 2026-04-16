@@ -5,7 +5,7 @@ import { MainPanel } from './(ui)/conversation/MainPanel';
 
 export default function Page() {
   return (
-    <div className="grid h-screen grid-cols-[240px_320px_minmax(0,1fr)] bg-neutral-950 text-neutral-100">
+    <div className="grid h-screen grid-cols-[320px_320px_minmax(0,1fr)] bg-neutral-950 text-neutral-100">
       <aside className="flex min-h-0 flex-col border-r border-neutral-800 bg-neutral-950">
         <header className="flex items-center justify-between border-b border-neutral-800 px-4 py-3">
           <h1 className="text-sm font-semibold tracking-tight">claude-ui</h1>
