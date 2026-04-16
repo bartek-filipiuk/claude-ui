@@ -11,33 +11,12 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { renderEvent } from '@/components/conversation/messages';
 import type { JsonlEvent } from '@/lib/jsonl/types';
 import { cn } from '@/lib/utils';
-
-type Category = 'user' | 'assistant' | 'tools' | 'system';
-const ALL_CATEGORIES: Category[] = ['user', 'assistant', 'tools', 'system'];
-
-function contentHasTool(content: unknown): boolean {
-  if (!Array.isArray(content)) return false;
-  for (const c of content) {
-    if (c && typeof c === 'object' && 'type' in c) {
-      const t = (c as { type: unknown }).type;
-      if (t === 'tool_use' || t === 'tool_result') return true;
-    }
-  }
-  return false;
-}
-
-function categorize(ev: JsonlEvent): Category {
-  if (ev.type === 'tool_use') return 'tools';
-  if (ev.type === 'tool_result') return 'tools';
-  if (ev.type === 'user') {
-    return contentHasTool(ev.message.content) ? 'tools' : 'user';
-  }
-  if (ev.type === 'assistant') {
-    return contentHasTool(ev.message.content) ? 'tools' : 'assistant';
-  }
-  if (ev.type === 'system' || ev.type === 'attachment') return 'system';
-  return 'system';
-}
+import {
+  categorizeEvent as categorize,
+  EVENT_CATEGORIES as ALL_CATEGORIES,
+  type EventCategory as Category,
+} from '@/lib/jsonl/outline';
+import { Outline } from './Outline';
 
 const CATEGORY_LABEL: Record<Category, string> = {
   user: 'User',
@@ -55,6 +34,10 @@ export function Viewer() {
   const [follow, setFollow] = useState(true);
   const [hidden, setHidden] = useState<Set<Category>>(new Set());
   const [onlyHits, setOnlyHits] = useState(false);
+  const [visibleRange, setVisibleRange] = useState<{ start: number; end: number }>({
+    start: 0,
+    end: 0,
+  });
   const virtuosoRef = useRef<VirtuosoHandle>(null);
 
   const categoryCounts = useMemo(() => {
@@ -208,27 +191,42 @@ export function Viewer() {
         </div>
       )}
 
-      <div className="min-h-0 flex-1">
-        {events.length === 0 && loading ? (
-          <div className="flex flex-col gap-3 p-4">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <Skeleton key={i} className="h-16 w-full" />
-            ))}
-          </div>
-        ) : visibleEvents.length === 0 ? (
-          <div className="flex h-full items-center justify-center p-8 text-sm text-neutral-500">
-            Żadne zdarzenie nie pasuje do filtrów.
-          </div>
-        ) : (
-          <Virtuoso
-            ref={virtuosoRef}
-            className={cn('h-full')}
-            data={visibleEvents}
-            followOutput={follow ? 'smooth' : false}
-            atBottomThreshold={120}
-            itemContent={(index, pair) => (
-              <div className="px-4 py-1.5">{renderEvent(pair.ev, pair.origIndex)}</div>
-            )}
+      <div className="flex min-h-0 flex-1">
+        <div className="min-h-0 min-w-0 flex-1">
+          {events.length === 0 && loading ? (
+            <div className="flex flex-col gap-3 p-4">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <Skeleton key={i} className="h-16 w-full" />
+              ))}
+            </div>
+          ) : visibleEvents.length === 0 ? (
+            <div className="flex h-full items-center justify-center p-8 text-sm text-neutral-500">
+              Żadne zdarzenie nie pasuje do filtrów.
+            </div>
+          ) : (
+            <Virtuoso
+              ref={virtuosoRef}
+              className={cn('h-full')}
+              data={visibleEvents}
+              followOutput={follow ? 'smooth' : false}
+              atBottomThreshold={120}
+              rangeChanged={({ startIndex, endIndex }) =>
+                setVisibleRange({ start: startIndex, end: endIndex })
+              }
+              itemContent={(index, pair) => (
+                <div className="px-4 py-1.5">{renderEvent(pair.ev, pair.origIndex)}</div>
+              )}
+            />
+          )}
+        </div>
+        {visibleEvents.length > 0 && (
+          <Outline
+            events={visibleEvents}
+            visibleStart={visibleRange.start}
+            visibleEnd={visibleRange.end}
+            onJump={(idx) =>
+              virtuosoRef.current?.scrollToIndex({ index: idx, align: 'center' })
+            }
           />
         )}
       </div>
