@@ -1,4 +1,7 @@
 import { create } from 'zustand';
+import { isSortMode, loadLayout, patchLayout, type SortMode } from '@/lib/ui/layout-storage';
+
+export type { SortMode };
 
 interface UiState {
   selectedProjectSlug: string | null;
@@ -7,6 +10,7 @@ interface UiState {
   terminalOpen: boolean;
   terminalCwd: string | null;
   editorOpen: boolean;
+  sortMode: SortMode;
   setSelectedProject: (slug: string | null) => void;
   setSelectedSession: (id: string | null) => void;
   setSearch: (q: string) => void;
@@ -14,6 +18,15 @@ interface UiState {
   closeTerminal: () => void;
   openEditor: () => void;
   closeEditor: () => void;
+  setSortMode: (mode: SortMode) => void;
+}
+
+const DEFAULT_SORT: SortMode = 'activity';
+
+function initialSortMode(): SortMode {
+  if (typeof window === 'undefined') return DEFAULT_SORT;
+  const stored = loadLayout().sortMode;
+  return isSortMode(stored) ? stored : DEFAULT_SORT;
 }
 
 export const useUiStore = create<UiState>((set) => ({
@@ -23,6 +36,7 @@ export const useUiStore = create<UiState>((set) => ({
   terminalOpen: false,
   terminalCwd: null,
   editorOpen: false,
+  sortMode: initialSortMode(),
   setSelectedProject: (slug) =>
     set(() => ({
       selectedProjectSlug: slug,
@@ -36,4 +50,8 @@ export const useUiStore = create<UiState>((set) => ({
   closeTerminal: () => set({ terminalOpen: false, terminalCwd: null }),
   openEditor: () => set({ editorOpen: true, terminalOpen: false }),
   closeEditor: () => set({ editorOpen: false }),
+  setSortMode: (mode) => {
+    patchLayout({ sortMode: mode });
+    set({ sortMode: mode });
+  },
 }));

@@ -1,0 +1,53 @@
+export const LAYOUT_STORAGE_KEY = 'claude-ui:layout';
+
+export type SortMode = 'activity' | 'name' | 'sessions';
+
+export interface LayoutState {
+  sidebar?: number;
+  sessions?: number;
+  sortMode?: SortMode;
+}
+
+const VALID_SORTS: SortMode[] = ['activity', 'name', 'sessions'];
+
+function readRaw(): Record<string, unknown> {
+  if (typeof window === 'undefined') return {};
+  try {
+    const raw = window.localStorage.getItem(LAYOUT_STORAGE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+    return parsed as Record<string, unknown>;
+  } catch {
+    return {};
+  }
+}
+
+export function loadLayout(): LayoutState {
+  const raw = readRaw();
+  const out: LayoutState = {};
+  const sidebar = raw['sidebar'];
+  if (typeof sidebar === 'number' && Number.isFinite(sidebar)) out.sidebar = sidebar;
+  const sessions = raw['sessions'];
+  if (typeof sessions === 'number' && Number.isFinite(sessions)) out.sessions = sessions;
+  const sortMode = raw['sortMode'];
+  if (typeof sortMode === 'string' && VALID_SORTS.includes(sortMode as SortMode)) {
+    out.sortMode = sortMode as SortMode;
+  }
+  return out;
+}
+
+export function patchLayout(partial: LayoutState): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const raw = readRaw();
+    const next = { ...raw, ...partial };
+    window.localStorage.setItem(LAYOUT_STORAGE_KEY, JSON.stringify(next));
+  } catch {
+    // swallow quota / access errors
+  }
+}
+
+export function isSortMode(value: unknown): value is SortMode {
+  return typeof value === 'string' && VALID_SORTS.includes(value as SortMode);
+}

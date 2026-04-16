@@ -12,7 +12,9 @@ import { useUiStore } from '@/stores/ui-slice';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Select } from '@/components/ui/select';
 import { timeAgo } from '@/lib/ui/format';
+import { isSortMode, type SortMode } from '@/lib/ui/layout-storage';
 import { cn } from '@/lib/utils';
 
 export function ProjectList() {
@@ -22,10 +24,12 @@ export function ProjectList() {
   const search = useUiStore((s) => s.search);
   const selectedSlug = useUiStore((s) => s.selectedProjectSlug);
   const setSelected = useUiStore((s) => s.setSelectedProject);
+  const sortMode = useUiStore((s) => s.sortMode);
+  const setSortMode = useUiStore((s) => s.setSortMode);
 
   const visible = useMemo(
-    () => filterAndSortProjects(data ?? [], meta ?? {}, search),
-    [data, meta, search],
+    () => filterAndSortProjects(data ?? [], meta ?? {}, search, sortMode),
+    [data, meta, search, sortMode],
   );
 
   if (isLoading) return <LoadingState />;
@@ -34,6 +38,21 @@ export function ProjectList() {
 
   return (
     <ScrollArea className="h-full">
+      <div className="flex items-center justify-between px-3 pb-1 pt-2">
+        <span className="text-[10px] uppercase tracking-wider text-neutral-500">Sortuj</span>
+        <Select
+          aria-label="Sortowanie projektów"
+          value={sortMode}
+          onChange={(e) => {
+            const next = e.target.value;
+            if (isSortMode(next)) setSortMode(next);
+          }}
+        >
+          <option value="activity">Ostatnia aktywność</option>
+          <option value="name">Nazwa</option>
+          <option value="sessions">Liczba sesji</option>
+        </Select>
+      </div>
       <ul className="flex flex-col gap-0.5 p-2" role="list">
         {visible.map((p) => {
           const entry = meta?.[p.slug];
@@ -62,10 +81,17 @@ export function ProjectList() {
   );
 }
 
+function projectSortName(project: ProjectSummary, meta: ProjectMetaMap): string {
+  const alias = meta[project.slug]?.alias;
+  if (alias) return alias;
+  return project.resolvedCwd ?? project.displayPath ?? project.slug;
+}
+
 export function filterAndSortProjects(
   projects: ProjectSummary[],
   meta: ProjectMetaMap,
   search: string,
+  sortMode: SortMode = 'activity',
 ): ProjectSummary[] {
   const q = search.trim().toLowerCase();
   const filtered = q
@@ -79,10 +105,17 @@ export function filterAndSortProjects(
         );
       })
     : projects.slice();
+  const collator = new Intl.Collator(undefined, { sensitivity: 'base' });
   filtered.sort((a, b) => {
     const aFav = meta[a.slug]?.favorite === true ? 1 : 0;
     const bFav = meta[b.slug]?.favorite === true ? 1 : 0;
     if (aFav !== bFav) return bFav - aFav;
+    if (sortMode === 'name') {
+      return collator.compare(projectSortName(a, meta), projectSortName(b, meta));
+    }
+    if (sortMode === 'sessions') {
+      if (a.sessionCount !== b.sessionCount) return b.sessionCount - a.sessionCount;
+    }
     const aTs = a.lastActivity ? Date.parse(a.lastActivity) : 0;
     const bTs = b.lastActivity ? Date.parse(b.lastActivity) : 0;
     return bTs - aTs;

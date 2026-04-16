@@ -10,7 +10,9 @@ import {
   type ReactNode,
 } from 'react';
 
-export const LAYOUT_STORAGE_KEY = 'claude-ui:layout';
+import { LAYOUT_STORAGE_KEY, loadLayout, patchLayout } from '@/lib/ui/layout-storage';
+
+export { LAYOUT_STORAGE_KEY };
 export const MIN_SIDEBAR = 200;
 export const MIN_SESSIONS = 240;
 export const MIN_VIEWER = 400;
@@ -35,27 +37,15 @@ export function clampWidths(w: LayoutWidths, viewport: number): LayoutWidths {
 
 export function loadWidths(): LayoutWidths {
   const defaults: LayoutWidths = { sidebar: DEFAULT_SIDEBAR, sessions: DEFAULT_SESSIONS };
-  if (typeof window === 'undefined') return defaults;
-  try {
-    const raw = window.localStorage.getItem(LAYOUT_STORAGE_KEY);
-    if (!raw) return defaults;
-    const parsed = JSON.parse(raw) as unknown;
-    if (!parsed || typeof parsed !== 'object') return defaults;
-    const s = Number((parsed as { sidebar?: unknown }).sidebar);
-    const se = Number((parsed as { sessions?: unknown }).sessions);
-    if (!Number.isFinite(s) || !Number.isFinite(se)) return defaults;
-    return { sidebar: s, sessions: se };
-  } catch {
-    return defaults;
-  }
+  const stored = loadLayout();
+  return {
+    sidebar: Number.isFinite(stored.sidebar) ? (stored.sidebar as number) : defaults.sidebar,
+    sessions: Number.isFinite(stored.sessions) ? (stored.sessions as number) : defaults.sessions,
+  };
 }
 
 function saveWidths(w: LayoutWidths): void {
-  try {
-    window.localStorage.setItem(LAYOUT_STORAGE_KEY, JSON.stringify(w));
-  } catch {
-    // swallow quota / access errors
-  }
+  patchLayout({ sidebar: w.sidebar, sessions: w.sessions });
 }
 
 interface ResizableColumnsProps {
