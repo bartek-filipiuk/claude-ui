@@ -212,7 +212,7 @@ next `[ ]`. Never reorder or delete tasks — only check them off.
 
 ### T16 — Default event-category filters
 
-- [ ] **Goal:** persist which categories (user/assistant/tools/system)
+- [x] **Goal:** persist which categories (user/assistant/tools/system)
   start hidden when a session is opened. Today user clicks chips every
   time; power users almost always want Tools off by default.
 - **Touch:** extend `Settings` in `lib/settings/types.ts` with
