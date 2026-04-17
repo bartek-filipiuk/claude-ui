@@ -292,7 +292,7 @@ next `[ ]`. Never reorder or delete tasks — only check them off.
 
 ### T21 — Diff-before-save in CLAUDE.md editor
 
-- [ ] **Goal:** in the editor header, a "Pokaż diff" button opens a
+- [x] **Goal:** in the editor header, a "Pokaż diff" button opens a
       modal showing the colored diff between current buffer and what's on
       disk. Save button inside the modal confirms the write.
 - **Touch:** `app/(ui)/editor/MarkdownEditor.tsx`, reuse existing
