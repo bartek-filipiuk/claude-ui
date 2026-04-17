@@ -7,9 +7,10 @@ One Chromium window. Every project. Every session. A real shell in
 every tab. Zero cloud. Zero extra API cost. And a security model that
 treats `127.0.0.1` like the attack surface it actually is.
 
-> Built as a defense-in-depth exercise on top of Next.js 15. Eight phases,
-> 230+ unit/integration tests, 18 end-to-end specs, zero `npm audit`
-> findings, one tightly-scoped PTY multiplexer.
+> Built as a defense-in-depth exercise on top of Next.js 15. Eight
+> phases plus a quarter of feature work on top. 564 unit + integration
+> tests, 7 end-to-end specs, zero `pnpm audit` findings, one
+> tightly-scoped PTY multiplexer.
 
 ---
 
@@ -51,18 +52,22 @@ one-shot token you never see.
 
 ## At a glance
 
-| Area             | What you get                                                  |
-| ---------------- | ------------------------------------------------------------- |
-| Projects sidebar | Auto-discovered from `~/.claude/projects/`, aliasable, search |
-| Session list     | Preview, size, message count, relative mtime                  |
-| Viewer           | Streaming JSONL, virtualised, 9 event types, search + filters |
-| Terminal         | Up to 16 concurrent PTYs, backpressure, SIGHUP teardown       |
-| CLAUDE.md editor | CodeMirror 6, atomic write, `If-Unmodified-Since` conflict    |
-| Live updates     | chokidar → WebSocket → TanStack Query invalidation            |
-| Auth             | Ephemeral port + 32B token + HttpOnly cookie + CSRF           |
-| CSP              | Per-request nonce, `strict-dynamic`, no `unsafe-inline`       |
-| Path traversal   | `fs.realpath` + prefix equality (fuzz-tested, 100 payloads)   |
-| Audit log        | Whitelisted fields only, 0600 file, 0700 dir                  |
+| Area             | What you get                                                                                |
+| ---------------- | ------------------------------------------------------------------------------------------- |
+| Projects sidebar | Auto-discovery, aliases, favorites/pin, group-by-prefix, sort by activity/name/count        |
+| Session list     | Preview, size, message count, relative mtime, cost estimate per session                     |
+| Viewer           | Streaming JSONL, virtualised, 9 event types, search + filters, outline/minimap, stats bar   |
+| Conversation UX  | Diff rendering for `Edit`/`Write` tool results, parent `tool_use` popover, replay mode      |
+| Terminal         | Up to 16 concurrent PTYs, quick-actions row, git branch badge, clear/save buffer            |
+| Editor           | CodeMirror 6, markdown preview split, diff-before-save, recent files dropdown, atomic write |
+| Live updates     | chokidar → WebSocket → TanStack Query invalidation, toast notifications                     |
+| Command UX       | Command palette (`Ctrl+K`), keyboard shortcuts overlay (`?`), jump-to-event input           |
+| Settings         | Fonts, density, theme, timestamp format, default filters, model pricing — persisted JSON    |
+| Auth             | Ephemeral port + 32B token + HttpOnly cookie + CSRF double-submit                           |
+| CSP              | Per-request nonce, `strict-dynamic`, no `unsafe-inline` in script-src                       |
+| Path traversal   | `fs.realpath` + prefix equality (fuzz-tested, 100 payloads)                                 |
+| Audit log        | Whitelisted fields only, 0600 file, 0700 dir                                                |
+| Platform         | Linux + macOS helpers (`lib/server/platform.ts`), `npx codehelm-install` bootstrap          |
 
 ---
 
@@ -171,9 +176,11 @@ returns zero.
 ## Quick start
 
 Requirements: Node 20.11+, pnpm 9+, Chromium or Google Chrome. Linux
-is the primary target (Ubuntu 22.04+ tested); macOS support is being
-rolled in per the `PLATFORM_I18N_PLAN.md` roadmap. On Windows run the
-launcher inside WSL — the Windows-native shell is intentionally out of
+is the primary target (Ubuntu 22.04+ tested); macOS is supported via
+the `lib/server/platform.ts` helpers (Chrome.app discovery, zsh
+default, `$TMPDIR` fallback), with the caveat that `node-pty` prebuilt
+binaries for Darwin still need verification on hardware. On Windows,
+run inside WSL — the Windows-native shell is intentionally out of
 scope. The UI ships in English.
 
 ```bash
@@ -181,6 +188,14 @@ git clone https://github.com/bartek-filipiuk/codehelm.git
 cd codehelm
 pnpm install
 ./bin/codehelm
+```
+
+Or one-shot via the installer (detects OS, verifies Node + pnpm,
+builds, creates `~/.local/bin/codehelm` symlink):
+
+```bash
+node bin/install.ts --dry-run   # report only, no writes
+node bin/install.ts              # full install
 ```
 
 The launcher will:
@@ -345,17 +360,31 @@ The full backlog lives in [IMPROVEMENTPLAN.md](IMPROVEMENTPLAN.md),
 bucketed by value/cost. The active queue in [TASKS.md](TASKS.md) is
 consumed by an autonomous nightly scheduler that picks the next
 unchecked task, implements it under the same test discipline, commits,
-and checks the box. See the top of that file for the protocol.
+and opens a PR against `main`.
 
-Active fronts:
+Shipped since phase-7-done (T01–T29):
 
-- Settings modal (fonts, density, theme).
-- Command palette (`Ctrl+K`) for instant project / session / action.
-- Resizable columns with persistent layout.
-- Session outline / minimap for long conversations.
-- Diff view for `Edit` / `Write` tool results.
-- Speculative: a conversation DAG, a cost estimator, a replay mode
-  for post-mortems.
+- Resolve-cwd fallback for legacy projects; resizable columns;
+  favorites/pin; sort toggle.
+- Keyboard shortcuts overlay (`?`); command palette (`Ctrl+K`);
+  outline/minimap; stats bar; toast notifications.
+- Settings modal (fonts, density, theme, timestamp format, default
+  filters, model pricing).
+- Diff rendering for tool results; markdown preview split; cost
+  estimator; replay mode; jump-to-event; terminal clear/save.
+- Parent `tool_use` popover; diff-before-save; recent CLAUDE.md
+  dropdown; terminal quick-actions row; git branch badge.
+- Project grouping by path prefix; default event-category filters.
+- Cross-platform helpers (Linux + macOS) and `npx codehelm-install`
+  bootstrap.
+- Full English UI + docs sweep with a source-tree-wide guard test
+  against Polish diacritic regressions.
+
+Open:
+
+- T25 — `node-pty` macOS prebuild verification (needs a Darwin host).
+- README polish + fresh banner after the `claude-ui → codehelm`
+  rebrand landed.
 
 ---
 
