@@ -1,15 +1,15 @@
-# `claude-ui` architecture
+# `codehelm` architecture
 
 ## Big picture
 
 ```
 ┌────────────────────────────────────────────────────────┐
-│  bin/claude-ui  (launcher)                             │
+│  bin/codehelm  (launcher)                             │
 │  1. find ephemeral port (49152-65535)                  │
 │  2. gen 32B token (crypto.randomBytes)                 │
 │  3. spawn `tsx server.ts` with PORT + TOKEN in env     │
 │  4. poll /healthz (auth-exempt) until ready            │
-│  5. mkdir -m 0700 $XDG_RUNTIME_DIR/claude-ui/<uuid>    │
+│  5. mkdir -m 0700 $XDG_RUNTIME_DIR/codehelm/<uuid>    │
 │  6. spawn chromium --app=http://127.0.0.1:PORT/?k=TOK  │
 │       --user-data-dir=<profile>                        │
 │  7. SIGTERM/SIGINT trap → kill children + rm profile   │
@@ -95,7 +95,7 @@
 - `lib/pty/*`
   - `manager.ts` — singleton, `Map<id, PtyHandle>`, cap 16, rate limit 10/min.
   - `spawn.ts` — node-pty wrapper, resolves `$SHELL` with per-OS fallbacks.
-  - `audit.ts` — appends `~/.claude/claude-ui/audit.log`.
+  - `audit.ts` — appends `~/.codehelm/audit.log`.
 - `lib/watcher/chokidar.ts` — singleton watcher + EventEmitter.
 - `lib/ws/*`
   - `server.ts` — upgrade router and handshake auth.

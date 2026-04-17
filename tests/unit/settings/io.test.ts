@@ -23,19 +23,19 @@ vi.mock('@/lib/server/config', () => {
       get CLAUDE_GLOBAL_MD() {
         return join(tmpHome, '.claude', 'CLAUDE.md');
       },
-      get CLAUDE_UI_STATE_DIR() {
-        return join(tmpHome, '.claude', 'claude-ui');
+      get CODEHELM_STATE_DIR() {
+        return join(tmpHome, '.codehelm');
       },
       get AUDIT_LOG() {
-        return join(tmpHome, '.claude', 'claude-ui', 'audit.log');
+        return join(tmpHome, '.codehelm', 'audit.log');
       },
     },
   };
 });
 
 beforeEach(async () => {
-  tmpHome = join(tmpdir(), `claude-ui-settings-${randomBytes(6).toString('hex')}`);
-  stateDir = join(tmpHome, '.claude', 'claude-ui');
+  tmpHome = join(tmpdir(), `codehelm-settings-${randomBytes(6).toString('hex')}`);
+  stateDir = join(tmpHome, '.codehelm');
   SETTINGS_FILE = join(stateDir, 'settings.json');
   await mkdir(stateDir, { recursive: true });
   vi.resetModules();

@@ -49,8 +49,8 @@ describe('runtimeRootDir', () => {
 });
 
 describe('chromiumCandidates', () => {
-  it('honours CLAUDE_UI_CHROMIUM override as the first candidate', () => {
-    const list = chromiumCandidates({ CLAUDE_UI_CHROMIUM: '/opt/brave/brave' }, 'linux');
+  it('honours CODEHELM_CHROMIUM override as the first candidate', () => {
+    const list = chromiumCandidates({ CODEHELM_CHROMIUM: '/opt/brave/brave' }, 'linux');
     expect(list[0]).toBe('/opt/brave/brave');
   });
 
@@ -72,7 +72,7 @@ describe('chromiumCandidates', () => {
   });
 
   it('skips empty overrides without crashing', () => {
-    const list = chromiumCandidates({ CLAUDE_UI_CHROMIUM: '' }, 'linux');
+    const list = chromiumCandidates({ CODEHELM_CHROMIUM: '' }, 'linux');
     expect(list[0]).toBe('/usr/bin/chromium');
   });
 });

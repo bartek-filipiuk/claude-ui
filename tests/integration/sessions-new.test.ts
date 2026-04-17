@@ -10,7 +10,7 @@ import { startServer, type StartedServer } from './helpers/start-server';
  * that HOME.
  */
 function buildFakeHome() {
-  const home = mkdtempSync(`${tmpdir()}/claude-ui-new-session-`);
+  const home = mkdtempSync(`${tmpdir()}/codehelm-new-session-`);
   const projectDir = `${home}/proj`;
   mkdirSync(projectDir, { recursive: true });
   const slug = projectDir.replace(/\//g, '-');
@@ -40,8 +40,8 @@ beforeAll(async () => {
   server = await startServer({ HOME: fake.home });
   const res = await fetch(`${server.baseUrl}/api/auth?k=${server.token}`, { redirect: 'manual' });
   const cookies = res.headers.getSetCookie();
-  const auth = cookies.find((c) => c.startsWith('claude_ui_auth='))?.split(';', 1)[0] ?? '';
-  const csrf = cookies.find((c) => c.startsWith('claude_ui_csrf='))?.split(';', 1)[0] ?? '';
+  const auth = cookies.find((c) => c.startsWith('codehelm_auth='))?.split(';', 1)[0] ?? '';
+  const csrf = cookies.find((c) => c.startsWith('codehelm_csrf='))?.split(';', 1)[0] ?? '';
   authCookie = [auth, csrf].filter(Boolean).join('; ');
   csrfCookie = csrf.split('=')[1] ?? '';
 }, 30_000);

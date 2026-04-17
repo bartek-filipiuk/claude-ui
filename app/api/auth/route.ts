@@ -26,7 +26,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     '<!doctype html><html><head><meta charset="utf-8">' +
     '<meta name="robots" content="noindex,nofollow">' +
     '<meta http-equiv="refresh" content="0;url=/">' +
-    '<title>claude-ui</title></head>' +
+    '<title>codehelm</title></head>' +
     '<body><script>window.location.replace("/");</script></body></html>';
   const res = new NextResponse(html, {
     status: 200,

@@ -54,7 +54,7 @@ function waitHealth(port: number, timeoutMs = 20_000): Promise<void> {
 }
 
 function buildFakeHome() {
-  const home = mkdtempSync(`${tmpdir()}/claude-ui-phase5-`);
+  const home = mkdtempSync(`${tmpdir()}/codehelm-phase5-`);
   // Hex-only session IDs — lib/jsonl/index accepts only canonical UUID shape.
   const ids = {
     alpha: '00000000-0000-4000-8000-aaaaaaaaaaaa',
@@ -103,7 +103,7 @@ test.beforeAll(async () => {
     env: {
       ...process.env,
       PORT: String(port),
-      CLAUDE_UI_TOKEN: token,
+      CODEHELM_TOKEN: token,
       HOST: '127.0.0.1',
       NODE_ENV: 'test',
       LOG_LEVEL: 'error',

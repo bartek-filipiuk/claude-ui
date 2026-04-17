@@ -12,7 +12,7 @@ export default function Page() {
       sidebar={
         <aside className="flex min-h-0 flex-col bg-neutral-950">
           <header className="flex items-center justify-between border-b border-neutral-800 px-4 py-3">
-            <h1 className="text-sm font-semibold tracking-tight">claude-ui</h1>
+            <h1 className="text-sm font-semibold tracking-tight">codehelm</h1>
             <div className="flex items-center gap-2">
               <span className="text-[10px] uppercase tracking-wider text-neutral-500">local</span>
               <SettingsDialog />

@@ -53,8 +53,8 @@ describe('GET /api/auth', () => {
     expect(body).not.toContain(server.token);
 
     const cookies = res.headers.getSetCookie();
-    const auth = cookies.find((c) => c.startsWith('claude_ui_auth='));
-    const csrf = cookies.find((c) => c.startsWith('claude_ui_csrf='));
+    const auth = cookies.find((c) => c.startsWith('codehelm_auth='));
+    const csrf = cookies.find((c) => c.startsWith('codehelm_csrf='));
     expect(auth).toBeDefined();
     expect(auth).toMatch(/HttpOnly/i);
     expect(auth).toMatch(/SameSite=lax/i);

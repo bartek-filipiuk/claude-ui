@@ -16,7 +16,7 @@ import { isProjectGrouping, isSortMode, type SortMode } from '@/lib/ui/layout-st
 import { groupProjectsByPrefix, type ProjectGroup } from '@/lib/projects/group-by-prefix';
 import { cn } from '@/lib/utils';
 
-const GROUP_OPEN_STORAGE_KEY = 'claude-ui:project-groups:open';
+const GROUP_OPEN_STORAGE_KEY = 'codehelm:project-groups:open';
 
 function loadGroupOpenMap(): Record<string, boolean> {
   if (typeof window === 'undefined') return {};

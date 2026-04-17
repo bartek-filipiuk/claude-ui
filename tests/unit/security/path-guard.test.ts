@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { assertInside } from '@/lib/security/path-guard';
 
-const TMP = join(tmpdir(), `claude-ui-path-guard-${Date.now()}`);
+const TMP = join(tmpdir(), `codehelm-path-guard-${Date.now()}`);
 const ROOT = join(TMP, 'root');
 const OUTSIDE = join(TMP, 'outside');
 

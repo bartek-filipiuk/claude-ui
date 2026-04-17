@@ -2,7 +2,7 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 
 /**
- * Pure, testable helpers that back the `claude-ui-install` CLI. Keep them
+ * Pure, testable helpers that back the `codehelm install` CLI. Keep them
  * free of side effects (no spawn, no fs writes) so unit tests can hit
  * every branch without stubbing the filesystem.
  */

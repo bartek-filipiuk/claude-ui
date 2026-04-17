@@ -65,7 +65,7 @@ export async function startServer(extraEnv: Record<string, string> = {}): Promis
     env: {
       ...process.env,
       PORT: String(port),
-      CLAUDE_UI_TOKEN: token,
+      CODEHELM_TOKEN: token,
       HOST: '127.0.0.1',
       NODE_ENV: 'test',
       LOG_LEVEL: 'error',

@@ -33,7 +33,7 @@ export type {
   Theme,
 } from './types';
 
-const SETTINGS_FILE = join(PATHS.CLAUDE_UI_STATE_DIR, 'settings.json');
+const SETTINGS_FILE = join(PATHS.CODEHELM_STATE_DIR, 'settings.json');
 
 export async function readSettings(): Promise<Settings> {
   try {

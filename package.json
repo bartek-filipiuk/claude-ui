@@ -1,11 +1,11 @@
 {
-  "name": "claude-ui",
+  "name": "codehelm",
   "version": "0.1.0",
   "private": true,
   "description": "Local web UI for managing Claude Code CLI sessions",
   "bin": {
-    "claude-ui": "./bin/claude-ui",
-    "claude-ui-install": "./bin/install.ts"
+    "codehelm": "./bin/codehelm",
+    "codehelm-install": "./bin/install.ts"
   },
   "scripts": {
     "dev": "tsx server.ts",

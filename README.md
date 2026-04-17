@@ -1,6 +1,6 @@
-# claude-ui
+# codehelm
 
-![claude-ui banner](screens/banner.webp)
+![codehelm banner](screens/banner.webp)
 
 A local-only command center for your Claude Code CLI sessions.
 One Chromium window. Every project. Every session. A real shell in
@@ -41,7 +41,7 @@ I made Claude debug the PTY race" means `grep -r` through 800 MB of JSONL.
 
 The CLI is great for one session at a time. It stops being great at 20.
 
-`claude-ui` is the missing front-end. It reads the JSONL you already
+`codehelm` is the missing front-end. It reads the JSONL you already
 have, spawns PTYs via `node-pty`, watches the directory with `chokidar`,
 and hands you a viewer, a multi-tab terminal, and a Markdown editor for
 `CLAUDE.md`. Everything happens in-process, on `127.0.0.1`, behind a
@@ -86,8 +86,8 @@ model reflects that.
 
 **Request authentication**
 
-- `claude_ui_auth` cookie: HttpOnly, SameSite=Lax, Path=/.
-- `claude_ui_csrf` cookie: readable by JS, paired with an
+- `codehelm_auth` cookie: HttpOnly, SameSite=Lax, Path=/.
+- `codehelm_csrf` cookie: readable by JS, paired with an
   `x-csrf-token` header. Double-submit on every unsafe method.
 - All comparisons are `crypto.timingSafeEqual`.
 - WebSocket upgrade checks cookie + Origin; the first WS message must
@@ -126,7 +126,7 @@ model reflects that.
 - `cwd` is path-guarded against `$HOME`.
 - SIGHUP on tab close, SIGKILL fallback after 5 seconds.
 
-**Audit log** (`~/.claude/claude-ui/audit.log`, `mode 0600`, dir `0700`)
+**Audit log** (`~/.codehelm/audit.log`, `mode 0600`, dir `0700`)
 
 Whitelisted keys only: `ts, event, sessionId, pid, cwd, shell, cols,
 rows, path, bytes, writeKind`. Never env, never tokens, never content,
@@ -142,10 +142,10 @@ never `stdout`/`stderr`. The pino logger redacts `token`, `authorization`,
 
 **Chromium profile**
 
-- `$XDG_RUNTIME_DIR/claude-ui-<uid>-<uuid>/`, `mode 0700`, tmpfs,
+- `$XDG_RUNTIME_DIR/codehelm-<uid>-<uuid>/`, `mode 0700`, tmpfs,
   auto-cleared at logout.
-- Fallback to `/tmp/claude-ui-<uid>-<uuid>/`, also 0700.
-- Trap on `SIGTERM`/`SIGINT`/`SIGHUP` in `bin/claude-ui` removes the
+- Fallback to `/tmp/codehelm-<uid>-<uuid>/`, also 0700.
+- Trap on `SIGTERM`/`SIGINT`/`SIGHUP` in `bin/codehelm` removes the
   profile on exit.
 
 **Shutdown**
@@ -177,10 +177,10 @@ launcher inside WSL — the Windows-native shell is intentionally out of
 scope. The UI ships in English.
 
 ```bash
-git clone https://github.com/bartek-filipiuk/claude-ui.git
-cd claude-ui
+git clone https://github.com/bartek-filipiuk/codehelm.git
+cd codehelm
 pnpm install
-./bin/claude-ui
+./bin/codehelm
 ```
 
 The launcher will:
@@ -197,7 +197,7 @@ every PTY, removes the profile directory, and exits cleanly.
 
 Environment variables:
 
-- `CLAUDE_UI_CHROMIUM=/path/to/chrome` — override auto-detect.
+- `CODEHELM_CHROMIUM=/path/to/chrome` — override auto-detect.
 - `LOG_LEVEL=debug` — verbose pino output. Default is `info`.
 
 ---
@@ -205,7 +205,7 @@ Environment variables:
 ## Architecture
 
 ```
-bin/claude-ui (node launcher)
+bin/codehelm (node launcher)
   find port → gen token → spawn server → poll /healthz → spawn chromium --app
       │
       ▼
@@ -325,7 +325,7 @@ release marker with a passing gate suite.
 
 ## Non-goals
 
-This is what `claude-ui` explicitly does **not** try to do:
+This is what `codehelm` explicitly does **not** try to do:
 
 - Send prompts through its own API. The embedded terminal is the
   prompting interface.

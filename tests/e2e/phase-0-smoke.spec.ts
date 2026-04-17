@@ -63,7 +63,7 @@ test.beforeAll(async () => {
     env: {
       ...process.env,
       PORT: String(port),
-      CLAUDE_UI_TOKEN: token,
+      CODEHELM_TOKEN: token,
       HOST: '127.0.0.1',
       NODE_ENV: 'test',
       LOG_LEVEL: 'error',
@@ -81,7 +81,7 @@ test.afterAll(async () => {
   });
 });
 
-test('placeholder strona widoczna po auth', async ({ page, context }) => {
+test('placeholder page visible after auth', async ({ page, context }) => {
   // Seed auth cookie via APIRequest (follows redirect, stores cookie in context).
   const authRes = await page.request.get(`http://127.0.0.1:${port}/api/auth?k=${token}`, {
     maxRedirects: 0,
@@ -89,13 +89,13 @@ test('placeholder strona widoczna po auth', async ({ page, context }) => {
   expect(authRes.status()).toBe(200);
 
   const cookies = await context.cookies();
-  const hasAuth = cookies.some((c) => c.name === 'claude_ui_auth');
+  const hasAuth = cookies.some((c) => c.name === 'codehelm_auth');
   expect(hasAuth).toBe(true);
 
   const resp = await page.goto(`http://127.0.0.1:${port}/`);
-  await expect(page.getByRole('heading', { name: 'claude-ui' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'codehelm' })).toBeVisible();
 
-  // CSP w response header — ustawiany per-request przez middleware.
+  // CSP response header — set per-request by the middleware.
   const csp = resp?.headers()['content-security-policy'] ?? '';
   expect(csp).toMatch(/script-src/);
   const scriptSrcLine = csp.match(/script-src[^;]*/)?.[0] ?? '';
@@ -110,7 +110,7 @@ test('Host: evil.com → 403', async ({ request: apiReq }) => {
   expect(res.status()).toBe(403);
 });
 
-test('bez cookie → 401 na / (auth wymagany)', async ({ request: apiReq }) => {
+test('no cookie → 401 on / (auth required)', async ({ request: apiReq }) => {
   const res = await apiReq.get(`http://127.0.0.1:${port}/`);
   expect(res.status()).toBe(401);
 });

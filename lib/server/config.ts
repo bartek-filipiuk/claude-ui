@@ -3,14 +3,15 @@ import { join } from 'node:path';
 
 const HOME = process.env['HOME'] ?? homedir();
 const CLAUDE_DIR = join(HOME, '.claude');
+const CODEHELM_STATE_DIR = join(HOME, '.codehelm');
 
 export const PATHS = {
   HOME,
   CLAUDE_DIR,
   CLAUDE_PROJECTS_DIR: join(CLAUDE_DIR, 'projects'),
   CLAUDE_GLOBAL_MD: join(CLAUDE_DIR, 'CLAUDE.md'),
-  CLAUDE_UI_STATE_DIR: join(CLAUDE_DIR, 'claude-ui'),
-  AUDIT_LOG: join(CLAUDE_DIR, 'claude-ui', 'audit.log'),
+  CODEHELM_STATE_DIR,
+  AUDIT_LOG: join(CODEHELM_STATE_DIR, 'audit.log'),
 } as const;
 
 export const LIMITS = {
@@ -25,16 +26,16 @@ export const LIMITS = {
 } as const;
 
 export const COOKIE_NAMES = {
-  AUTH: 'claude_ui_auth',
-  CSRF: 'claude_ui_csrf',
+  AUTH: 'codehelm_auth',
+  CSRF: 'codehelm_csrf',
 } as const;
 
 export const CSRF_HEADER = 'x-csrf-token';
 
 export function getServerToken(): string {
-  const token = process.env['CLAUDE_UI_TOKEN'];
+  const token = process.env['CODEHELM_TOKEN'];
   if (!token) {
-    throw new Error('CLAUDE_UI_TOKEN env var not set. Start via bin/claude-ui.');
+    throw new Error('CODEHELM_TOKEN env var not set. Start via bin/codehelm.');
   }
   return token;
 }

@@ -1,4 +1,4 @@
-# Security — `claude-ui`
+# Security — `codehelm`
 
 ## Context and threat model
 
@@ -29,8 +29,8 @@ The app is **local** — it binds to `127.0.0.1` only and opens inside a Chromiu
 | 10  | Referrer-Policy                                    | `no-referrer` globally (next.config.ts)                                                                              | curl check on response header                         |
 | 11  | Same-origin headers                                | `COOP: same-origin`, `CORP: same-origin`, `X-Frame-Options: DENY`                                                    | curl check                                            |
 | 12  | Path guard                                         | `lib/security/path-guard.ts` — `fs.realpath` + prefix check                                                          | unit: 100-payload fuzz without escape                 |
-| 13  | Chromium profile                                   | `$XDG_RUNTIME_DIR/claude-ui/<uuid>` mode 0700                                                                        | test: `stat -c '%a'` == 700                           |
-| 14  | Profile cleanup                                    | SIGTERM / SIGINT trap in `bin/claude-ui`                                                                             | test: start + kill + dir removed                      |
+| 13  | Chromium profile                                   | `$XDG_RUNTIME_DIR/codehelm/<uuid>` mode 0700                                                                         | test: `stat -c '%a'` == 700                           |
+| 14  | Profile cleanup                                    | SIGTERM / SIGINT trap in `bin/codehelm`                                                                              | test: start + kill + dir removed                      |
 | 15  | Rate limits                                        | per-session token-bucket: PTY 10/min, REST 100/min, WS 500 msg/s                                                     | integration: 11th spawn → 429                         |
 | 16  | Body limits                                        | PUT CLAUDE.md: 1 MB (413), rendered JSONL field: 10 MB truncate                                                      | integration: 2 MB body → 413                          |
 | 17  | PTY cap                                            | 16 concurrent tabs, 17th → rejected                                                                                  | unit + integration                                    |
@@ -112,7 +112,7 @@ The app is **local** — it binds to `127.0.0.1` only and opens inside a Chromiu
   - `COOP: same-origin`, `CORP: same-origin`
 - [ ] Rate limits live: manual `for i in {1..15}; do curl ... /api/sessions/new; done` → 10 OK + 5×429
 - [ ] Body limit live: `curl -X PUT ... -d @2mb.md` → 413
-- [ ] Token rotation: restart `claude-ui`, old cookie in Chromium → 401 + redirect to auth
+- [ ] Token rotation: restart `codehelm`, old cookie in Chromium → 401 + redirect to auth
 
 ## Playwright security suite (`tests/security/*.spec.ts`)
 
@@ -130,11 +130,11 @@ The app is **local** — it binds to `127.0.0.1` only and opens inside a Chromiu
 
 If a user spots suspicious activity (e.g. an unexpected PTY in `audit.log`):
 
-1. `grep '<suspicious-pid>' ~/.claude/claude-ui/audit.log` — full event history for that PID.
+1. `grep '<suspicious-pid>' ~/.codehelm/audit.log` — full event history for that PID.
 2. `ps -ef | grep <pid>` — check whether the process is still alive.
 3. `kill` the server (SIGTERM) — every PTY dies, profile gets cleaned up.
 4. Review `audit.log` — look for `spawn` events with an unexpected cwd or shell.
-5. Regenerate the token (restart `claude-ui`) — old cookies become invalid.
+5. Regenerate the token (restart `codehelm`) — old cookies become invalid.
 
 ## Out of scope (design notes)
 

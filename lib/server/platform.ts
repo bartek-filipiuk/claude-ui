@@ -76,7 +76,7 @@ export function chromiumCandidates(
   env: Readonly<Record<string, string | undefined>> = process.env,
   platform: NodeJS.Platform = process.platform,
 ): string[] {
-  const override = env['CLAUDE_UI_CHROMIUM'];
+  const override = env['CODEHELM_CHROMIUM'];
   const base = override && override.length > 0 ? [override] : [];
 
   if (platform === 'darwin') {

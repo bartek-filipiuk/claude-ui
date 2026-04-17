@@ -3,8 +3,8 @@ import { dirname, join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { PATHS } from '@/lib/server/config';
 
-const META_FILE = join(PATHS.CLAUDE_UI_STATE_DIR, 'meta.json');
-const LEGACY_ALIASES_FILE = join(PATHS.CLAUDE_UI_STATE_DIR, 'aliases.json');
+const META_FILE = join(PATHS.CODEHELM_STATE_DIR, 'meta.json');
+const LEGACY_ALIASES_FILE = join(PATHS.CODEHELM_STATE_DIR, 'aliases.json');
 const MAX_ALIAS_LEN = 120;
 const MAX_ENTRIES = 10_000;
 const ALIAS_RE = /^[\p{L}\p{N}\p{Mark} ._\-:/()&+]+$/u;

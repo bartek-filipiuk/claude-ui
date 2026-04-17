@@ -9,13 +9,13 @@ let csrfToken = '';
 let fakeHome: string;
 
 beforeAll(async () => {
-  fakeHome = mkdtempSync(`${tmpdir()}/claude-ui-settings-api-`);
-  mkdirSync(`${fakeHome}/.claude/claude-ui`, { recursive: true });
+  fakeHome = mkdtempSync(`${tmpdir()}/codehelm-settings-api-`);
+  mkdirSync(`${fakeHome}/.codehelm`, { recursive: true });
   server = await startServer({ HOME: fakeHome });
   const res = await fetch(`${server.baseUrl}/api/auth?k=${server.token}`, { redirect: 'manual' });
   const cookies = res.headers.getSetCookie();
-  const auth = cookies.find((c) => c.startsWith('claude_ui_auth='))?.split(';', 1)[0] ?? '';
-  const csrf = cookies.find((c) => c.startsWith('claude_ui_csrf='))?.split(';', 1)[0] ?? '';
+  const auth = cookies.find((c) => c.startsWith('codehelm_auth='))?.split(';', 1)[0] ?? '';
+  const csrf = cookies.find((c) => c.startsWith('codehelm_csrf='))?.split(';', 1)[0] ?? '';
   authCookie = [auth, csrf].filter(Boolean).join('; ');
   csrfToken = csrf.split('=')[1] ?? '';
 }, 30_000);

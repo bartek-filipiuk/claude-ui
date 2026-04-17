@@ -11,7 +11,7 @@
 - [ ] `tests/unit/pty/manager.test.ts` — cap 16, 17th rejected, rate limit 10/min, 1 MB backpressure
 - [ ] `lib/pty/manager.ts` — singleton `Map<id, {pty, cwd, shell, unacked, paused}>`, methods `spawn`, `write`, `resize`, `kill`, `list`
 - [ ] `lib/pty/spawn.ts` — resolve `$SHELL` (fallback `/bin/bash`), path-guard cwd, node-pty wrapper
-- [ ] `lib/pty/audit.ts` — append a JSON line to `~/.claude/claude-ui/audit.log`: `{ts, event, id, pid, cwd, shell, cols, rows}` — **not** env, **not** content
+- [ ] `lib/pty/audit.ts` — append a JSON line to `~/.claude/codehelm/audit.log`: `{ts, event, id, pid, cwd, shell, cols, rows}` — **not** env, **not** content
 - [ ] Audit log file mode 0600, parent dir 0700
 
 ### WebSocket transport
