@@ -228,7 +228,7 @@ next `[ ]`. Never reorder or delete tasks — only check them off.
 
 ### T17 — Timestamp display format
 
-- [ ] **Goal:** three formats for the small timestamp badge under each
+- [x] **Goal:** three formats for the small timestamp badge under each
   event: `relative` ("2 min temu"), `iso` ("2026-04-16T12:00:00Z"),
   `local` ("14:00:05", 24h). Chosen in Settings.
 - **Touch:** new `lib/jsonl/format-timestamp.ts` with pure function
