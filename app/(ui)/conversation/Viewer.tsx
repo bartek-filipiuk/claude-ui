@@ -19,6 +19,8 @@ import {
 import { buildToolUseRegistry } from '@/lib/jsonl/tool-pairs';
 import { Outline } from './Outline';
 import { StatsBar } from './StatsBar';
+import { ReplayBar } from './ReplayBar';
+import { useReplay } from '@/hooks/use-replay';
 
 const CATEGORY_LABEL: Record<Category, string> = {
   user: 'User',
@@ -43,6 +45,8 @@ export function Viewer() {
     end: 0,
   });
   const virtuosoRef = useRef<VirtuosoHandle>(null);
+
+  const [replayState, replayControls] = useReplay(events);
 
   const categoryCounts = useMemo(() => {
     const counts: Record<Category, number> = { user: 0, assistant: 0, tools: 0, system: 0 };
@@ -75,9 +79,13 @@ export function Viewer() {
   }, [pendingEventIndex, events.length, consumePendingEvent]);
 
   // Filter events (kept as pairs so navigation can still hop into filtered list).
+  // In Replay mode the source list is capped to the "revealed" count so the
+  // user sees only the already-played-back slice. Search and category filters
+  // still apply on top — useful for post-mortem drilling.
   const visibleEvents = useMemo(() => {
+    const cap = replayState.active ? replayState.revealed : events.length;
     const out: { ev: JsonlEvent; origIndex: number }[] = [];
-    for (let i = 0; i < events.length; i++) {
+    for (let i = 0; i < cap; i++) {
       const ev = events[i];
       if (!ev) continue;
       if (hidden.has(categorize(ev))) continue;
@@ -85,7 +93,33 @@ export function Viewer() {
       out.push({ ev, origIndex: i });
     }
     return out;
-  }, [events, hidden, onlyHits, query, hitEventIndexSet]);
+  }, [events, hidden, onlyHits, query, hitEventIndexSet, replayState.active, replayState.revealed]);
+
+  // Auto-scroll to the newest revealed event while playback is advancing.
+  useEffect(() => {
+    if (!replayState.active || !replayState.playing) return;
+    if (visibleEvents.length === 0) return;
+    virtuosoRef.current?.scrollToIndex({
+      index: visibleEvents.length - 1,
+      align: 'end',
+      behavior: 'auto',
+    });
+  }, [replayState.active, replayState.playing, visibleEvents.length]);
+
+  // Space toggles play/pause during replay (unless focus is in an input).
+  useEffect(() => {
+    if (!replayState.active) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key !== ' ' && e.code !== 'Space') return;
+      const target = e.target as HTMLElement | null;
+      const tag = target?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || target?.isContentEditable) return;
+      e.preventDefault();
+      replayControls.toggle();
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [replayState.active, replayControls]);
 
   if (!sessionId) {
     return (
@@ -176,11 +210,27 @@ export function Viewer() {
           variant={follow ? 'secondary' : 'outline'}
           onClick={() => setFollow((f) => !f)}
           aria-pressed={follow}
-          title="Automatyczne przewijanie do najnowszej wiadomości"
+          disabled={replayState.active}
+          title={
+            replayState.active
+              ? 'Follow wyłączone w trybie Replay'
+              : 'Automatyczne przewijanie do najnowszej wiadomości'
+          }
         >
           {follow ? 'Follow: on' : 'Follow: off'}
         </Button>
+        <Button
+          size="sm"
+          variant={replayState.active ? 'secondary' : 'outline'}
+          onClick={() => (replayState.active ? replayControls.exit() : replayControls.start())}
+          disabled={events.length === 0}
+          title="Odtwarzanie sesji event po evencie"
+        >
+          {replayState.active ? 'Replay: on' : 'Replay'}
+        </Button>
       </div>
+
+      {replayState.active && <ReplayBar state={replayState} controls={replayControls} />}
 
       <div className="flex flex-wrap items-center gap-2 border-b border-neutral-800 bg-neutral-950 px-4 py-2 text-[11px]">
         {ALL_CATEGORIES.map((c) => {

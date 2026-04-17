@@ -201,7 +201,7 @@ next `[ ]`. Never reorder or delete tasks — only check them off.
 
 ### T15 — Replay mode (effectful)
 
-- [ ] **Goal:** in Viewer, new button "Replay". Sessions plays back
+- [x] **Goal:** in Viewer, new button "Replay". Sessions plays back
   event-by-event with configurable speed (1x / 2x / 5x / "real-time
   between timestamps"). Useful for post-mortem review.
 - **Touch:** `app/(ui)/conversation/Viewer.tsx` state machine, speed
