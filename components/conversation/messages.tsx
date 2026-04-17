@@ -6,6 +6,9 @@ import type { DiffToolUse } from '@/lib/jsonl/tool-pairs';
 import { Markdown } from './Markdown';
 import { CodeBlock } from './CodeBlock';
 import { DiffView } from './DiffView';
+import { useSettings } from '@/hooks/use-settings';
+import { formatTimestamp } from '@/lib/jsonl/format-timestamp';
+import { DEFAULT_SETTINGS } from '@/lib/settings/types';
 
 export type ToolUseRegistry = ReadonlyMap<string, DiffToolUse>;
 
@@ -87,10 +90,12 @@ function Wrapper({
   role,
   color,
   children,
+  timestamp,
 }: {
   role: string;
   color: string;
   children: React.ReactNode;
+  timestamp?: string | undefined;
 }) {
   return (
     <div className="flex gap-3">
@@ -99,8 +104,25 @@ function Wrapper({
       </div>
       <div className="min-w-0 flex-1 rounded-md border border-neutral-800 bg-neutral-900/60 p-3">
         {children}
+        {timestamp && <TimestampBadge iso={timestamp} />}
       </div>
     </div>
+  );
+}
+
+function TimestampBadge({ iso }: { iso: string }) {
+  const { data: settings } = useSettings();
+  const mode = settings?.timestampFormat ?? DEFAULT_SETTINGS.timestampFormat;
+  const text = formatTimestamp(iso, mode);
+  if (!text) return null;
+  return (
+    <time
+      dateTime={iso}
+      className="mt-2 block font-mono text-[10px] text-neutral-500"
+      title={iso}
+    >
+      {text}
+    </time>
   );
 }
 
@@ -260,7 +282,7 @@ export function UserMsg({
 }) {
   const blocks = splitBlocks(ev.message.content);
   return (
-    <Wrapper role="user" color="text-blue-400">
+    <Wrapper role="user" color="text-blue-400" timestamp={ev.timestamp}>
       <Blocks blocks={blocks} markdown={false} registry={registry} />
     </Wrapper>
   );
@@ -275,7 +297,7 @@ export function AssistantMsg({
 }) {
   const blocks = splitBlocks(ev.message.content);
   return (
-    <Wrapper role="assistant" color="text-emerald-400">
+    <Wrapper role="assistant" color="text-emerald-400" timestamp={ev.timestamp}>
       <Blocks blocks={blocks} markdown={true} registry={registry} />
     </Wrapper>
   );
@@ -287,7 +309,7 @@ export function ToolUseMsg({ ev }: { ev: Extract<JsonlEvent, { type: 'tool_use' 
   const inputStr = ev.input ? JSON.stringify(ev.input, null, 2) : '{}';
   const preview = inputStr.slice(0, 200);
   return (
-    <Wrapper role="tool_use" color="text-amber-400">
+    <Wrapper role="tool_use" color="text-amber-400" timestamp={ev.timestamp}>
       <div className="flex items-center gap-2">
         <button
           type="button"
@@ -313,7 +335,7 @@ export function ToolResultMsg({ ev }: { ev: Extract<JsonlEvent, { type: 'tool_re
   const stderr = r?.stderr ?? '';
   const hasOutput = stdout || stderr;
   return (
-    <Wrapper role="tool_result" color="text-sky-400">
+    <Wrapper role="tool_result" color="text-sky-400" timestamp={ev.timestamp}>
       <div className="flex items-center gap-2">
         <button
           type="button"
@@ -355,7 +377,7 @@ export function ToolResultMsg({ ev }: { ev: Extract<JsonlEvent, { type: 'tool_re
 
 export function SystemMsg({ ev }: { ev: Extract<JsonlEvent, { type: 'system' }> }) {
   return (
-    <Wrapper role="system" color="text-neutral-500">
+    <Wrapper role="system" color="text-neutral-500" timestamp={ev.timestamp}>
       <p className="text-xs text-neutral-400">
         <span className="font-mono">{ev.slug ?? ev.subtype ?? 'event'}</span>
         {typeof ev.hookCount === 'number' && (
@@ -368,7 +390,7 @@ export function SystemMsg({ ev }: { ev: Extract<JsonlEvent, { type: 'system' }> 
 
 export function AttachmentMsg({ ev }: { ev: Extract<JsonlEvent, { type: 'attachment' }> }) {
   return (
-    <Wrapper role="attachment" color="text-purple-400">
+    <Wrapper role="attachment" color="text-purple-400" timestamp={ev.timestamp}>
       <p className="text-xs text-neutral-300">
         <span className="font-mono">{ev.hookName ?? ev.command ?? 'hook'}</span>
         <span className="ml-2 text-neutral-500">
@@ -381,7 +403,7 @@ export function AttachmentMsg({ ev }: { ev: Extract<JsonlEvent, { type: 'attachm
 
 export function PermissionMsg({ ev }: { ev: Extract<JsonlEvent, { type: 'permission-mode' }> }) {
   return (
-    <Wrapper role="permission" color="text-yellow-400">
+    <Wrapper role="permission" color="text-yellow-400" timestamp={ev.timestamp}>
       <p className="text-xs text-neutral-300">
         mode: <span className="font-mono text-yellow-200">{ev.mode ?? '—'}</span>
       </p>
@@ -391,7 +413,7 @@ export function PermissionMsg({ ev }: { ev: Extract<JsonlEvent, { type: 'permiss
 
 export function QueueMsg({ ev }: { ev: Extract<JsonlEvent, { type: 'queue-operation' }> }) {
   return (
-    <Wrapper role="queue" color="text-neutral-600">
+    <Wrapper role="queue" color="text-neutral-600" timestamp={ev.timestamp}>
       <p className="text-xs text-neutral-500">
         op: <span className="font-mono">{ev.operation ?? '—'}</span>
       </p>
@@ -399,11 +421,13 @@ export function QueueMsg({ ev }: { ev: Extract<JsonlEvent, { type: 'queue-operat
   );
 }
 
-export function FileHistoryMsg(_props: {
+export function FileHistoryMsg({
+  ev,
+}: {
   ev: Extract<JsonlEvent, { type: 'file-history-snapshot' }>;
 }) {
   return (
-    <Wrapper role="snapshot" color="text-neutral-600">
+    <Wrapper role="snapshot" color="text-neutral-600" timestamp={ev.timestamp}>
       <p className="text-xs text-neutral-500">file history snapshot</p>
     </Wrapper>
   );

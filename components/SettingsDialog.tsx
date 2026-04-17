@@ -30,6 +30,7 @@ import {
   type ModelRateKey,
 } from '@/lib/jsonl/usage';
 import { EVENT_CATEGORIES, type EventCategory } from '@/lib/jsonl/outline';
+import { TIMESTAMP_FORMATS, type TimestampFormat } from '@/lib/jsonl/format-timestamp';
 import { cn } from '@/lib/utils';
 
 const VIEWER_FONT_LABEL: Record<ViewerFontSize, string> = {
@@ -63,6 +64,12 @@ const CATEGORY_LABEL: Record<EventCategory, string> = {
   assistant: 'Asystent',
   tools: 'Narzędzia',
   system: 'System',
+};
+
+const TIMESTAMP_LABEL: Record<TimestampFormat, string> = {
+  relative: 'Względny (np. 2 min temu)',
+  iso: 'ISO (2026-04-16T12:00:00Z)',
+  local: 'Lokalny (14:00:05)',
 };
 
 const RATE_FIELDS: { key: keyof ModelRate; label: string }[] = [
@@ -183,6 +190,22 @@ export function SettingsDialog() {
               {THEMES.map((v) => (
                 <option key={v} value={v}>
                   {THEME_LABEL[v]}
+                </option>
+              ))}
+            </select>
+          </Field>
+
+          <Field label="Format znacznika czasu" htmlFor="timestampFormat">
+            <select
+              id="timestampFormat"
+              value={current.timestampFormat}
+              disabled={isPending}
+              onChange={(e) => update('timestampFormat', e.target.value as TimestampFormat)}
+              className="rounded-md border border-neutral-700 bg-neutral-900 px-2 py-1.5 text-sm text-neutral-100 focus:outline-none focus-visible:ring-1 focus-visible:ring-neutral-400"
+            >
+              {TIMESTAMP_FORMATS.map((v) => (
+                <option key={v} value={v}>
+                  {TIMESTAMP_LABEL[v]}
                 </option>
               ))}
             </select>

@@ -5,6 +5,7 @@ import {
   type ModelPricing,
 } from '@/lib/jsonl/usage';
 import { EVENT_CATEGORIES, type EventCategory } from '@/lib/jsonl/outline';
+import { TIMESTAMP_FORMATS, type TimestampFormat } from '@/lib/jsonl/format-timestamp';
 
 // Pure types + constants + zod schemas. No node imports so client bundles
 // (SettingsDialog, useSettings, SettingsApplier) can pull from here safely.
@@ -27,6 +28,7 @@ export interface Settings {
   theme: Theme;
   modelPricing: ModelPricing;
   hiddenCategories: EventCategory[];
+  timestampFormat: TimestampFormat;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -36,6 +38,7 @@ export const DEFAULT_SETTINGS: Settings = {
   theme: 'dark',
   modelPricing: DEFAULT_MODEL_PRICING,
   hiddenCategories: [],
+  timestampFormat: 'relative',
 };
 
 const nonNegative = z.number().nonnegative().finite();
@@ -61,6 +64,7 @@ export const SettingsSchema = z.object({
   theme: z.enum(THEMES),
   modelPricing: ModelPricingSchema,
   hiddenCategories: z.array(z.enum(EVENT_CATEGORIES)),
+  timestampFormat: z.enum(TIMESTAMP_FORMATS),
 });
 
 export const SettingsPatchSchema = SettingsSchema.partial();
