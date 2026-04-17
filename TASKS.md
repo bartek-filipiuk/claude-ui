@@ -336,6 +336,172 @@ next `[ ]`. Never reorder or delete tasks — only check them off.
   refreshes within 500 ms. Integration test for the endpoint (happy
   path + path outside $HOME → 403 + timeout → 504). No background work.
 
+### T24 — Platform helpers + macOS shell/paths plumbing
+
+- [ ] **Goal:** centralize OS differences in a single module so launcher,
+  PTY and installer never branch on `process.platform` inline. Ship
+  macOS parity for shell default, runtime directory and Chromium path.
+- **Touch:** new `lib/server/platform.ts`; `bin/claude-ui` (XDG/tmpdir
+  + chromium lookup); `lib/pty/spawn.ts` (resolveShell). Don't touch
+  `lib/server/audit.ts` (mode 0700 already portable across Unix).
+- **Logic:** `defaultShell()` returns `$SHELL` if it exists and starts
+  with `/`, else `/bin/zsh` on darwin or `/bin/bash` on linux — never
+  invokes a sub-shell. `runtimeRootDir()` tries `$XDG_RUNTIME_DIR` →
+  `$TMPDIR` → `os.tmpdir()` and passes the result through `fs.realpath`
+  before returning. `chromiumCandidates()` returns ordered paths per
+  `process.platform`; on darwin: `/Applications/Google Chrome.app/
+  Contents/MacOS/Google Chrome`, `/Applications/Chromium.app/...`,
+  `/Applications/Arc.app/...`; on linux: `chromium`, `chromium-browser`,
+  `google-chrome-stable`, `google-chrome`. Discovery must `fs.accessSync
+  (X_OK)` each candidate; no blind spawn.
+- **DoD:** unit tests in `tests/unit/server/platform.test.ts` cover 6
+  scenarios (shell fallback per OS, runtime dir with/without XDG/TMPDIR,
+  chromium candidates per OS, accessSync filtering). No `shell: true`
+  introduced anywhere. Path-guard fuzz (100 payloads) still green.
+  Manual Linux smoke: unchanged startup. Document assumption: Windows
+  is not a target — installer (T26) will hard-fail on win32.
+
+### T25 — node-pty macOS prebuild path
+
+- [ ] **Goal:** `pnpm install --frozen-lockfile` succeeds on Linux,
+  macOS arm64 and macOS x86_64 without invoking node-gyp. Supply-chain
+  safe: no new postinstall scripts, lockfile integrity preserved.
+- **Touch:** `package.json`, `pnpm-lock.yaml`, optionally
+  `lib/pty/spawn.ts` (imports) if API drift.
+- **Logic:** Plan A — `pnpm update @homebridge/node-pty-prebuilt-
+  multiarch@latest`, verify `node_modules/@homebridge/.../prebuilds/`
+  lists `darwin-arm64`, `darwin-x64`, `linux-x64`, `linux-arm64`. Plan
+  B (preferred if A misses darwin): switch to `node-pty@1.0.0`
+  (Microsoft upstream, prebuilt for all four). API is 95% compatible:
+  `IPty.onData`, `onExit`, `resize`, `kill` unchanged; adjust imports
+  only if TS types shift. `onlyBuiltDependencies` stays — no arbitrary
+  postinstall escape hatch.
+- **DoD:** `pnpm audit --production` zero high/critical. Existing
+  `tests/integration/pty/*` pass unchanged. Lockfile committed with
+  integrity hashes. New smoke test `tests/unit/pty/load.test.ts` that
+  dynamic-imports the pty module inside try/catch — asserts the import
+  resolves (doesn't invoke native load, so no platform dependency).
+  Manual verification: fresh clone on Linux and macOS both reach ready
+  PTY without compiling.
+
+### T26 — `claude-ui install` Node-based installer
+
+- [ ] **Goal:** single-command setup for a fresh Linux or macOS system.
+  `npx claude-ui-install` detects OS, verifies deps, builds, creates a
+  symlink in `~/.local/bin/claude-ui` without ever running arbitrary
+  shell strings or touching the user's shell rc.
+- **Touch:** new `bin/install.ts` (ESM Node script, shebang `#!/usr/bin
+  /env node`); new `lib/install/checks.ts` (pure helpers: `detectOs`,
+  `resolveHomeBinDir`, `needsPathUpdate`); add bin entry
+  `"claude-ui-install": "bin/install.ts"` in `package.json`.
+- **Logic (ordered, each step idempotent):**
+  1. `process.platform` ∈ {linux, darwin}; else exit 1 with WSL note.
+  2. Node version ≥ 20.11; else exit 1 suggesting `nvm install 20`.
+  3. pnpm present? If not, `corepack enable` + `corepack prepare pnpm@9
+     --activate` via `spawnSync` with array args.
+  4. `pnpm install --frozen-lockfile` (spawnSync, inherit stdio, 5 min
+     timeout).
+  5. Dry-load node-pty in try/catch; if fails, print repair hint and
+     exit 1.
+  6. `chromiumCandidates()` from T24 — info about first hit or a
+     "install Chrome/Chromium before running" note. Do not hard-fail.
+  7. `pnpm build` (next build + postbuild copies `server.ts` into
+     standalone). Skippable with `--skip-build`.
+  8. `mkdir -p ~/.local/bin` mode 0700. Create symlink
+     `~/.local/bin/claude-ui` → repoRoot + `/bin/claude-ui` using
+     `fs.symlinkSync`. Refuse if target exists and is not already a
+     matching symlink (never clobber).
+  9. PATH check: if `~/.local/bin` not in `$PATH`, print shell-specific
+     instruction to add it — never edit shell rc.
+- **Flags:** `--dry-run` (print plan, no writes), `--help`, `--skip-
+  build`, `--no-symlink`.
+- **Security:** every `spawnSync` uses `{shell: false}` with array args,
+  explicit timeouts; no `exec()`. Symlink target resolved via
+  `fs.realpath` and verified to point inside the repo. No env
+  variables or tokens are logged — only step markers and final summary.
+- **DoD:** unit tests in `tests/unit/install/*` cover `detectOs`
+  (linux/darwin/win32-throw), `resolveHomeBinDir`, `needsPathUpdate` (3
+  scenarios), and symlink-guard (refuses regular file, accepts new or
+  matching symlink). `rg -e 'shell:\s*true' bin/ lib/install/` = 0.
+  `--dry-run` on Linux and macOS prints a plan and exits 0 without
+  filesystem writes.
+
+### T27 — Rip Polish UI strings → English
+
+- [ ] **Goal:** replace all ~140 Polish UI strings in JSX with English
+  equivalents. No i18n library introduced. Regression-guard test
+  prevents Polish diacritics from re-entering the codebase.
+- **Touch (15 UI files):** `app/(ui)/sidebar/{ProjectList,Search}.tsx`;
+  `app/(ui)/session-explorer/{SessionList,ProjectHeader}.tsx`;
+  `app/(ui)/conversation/{Viewer,Outline,StatsBar,ReplayBar,MainPanel}
+  .tsx`; `app/(ui)/terminal/{TabBar,Terminal}.tsx`;
+  `app/(ui)/editor/MarkdownEditor.tsx`;
+  `components/{CommandPalette,HelpOverlay,SettingsDialog}.tsx`;
+  `lib/jsonl/format-timestamp.ts` (switch `Intl.RelativeTimeFormat`
+  locale to `'en'`); `app/layout.tsx` (`<html lang="en">`); every
+  toast call-site (`lib/ui/toast.ts` consumers).
+- **Logic:** direct translation keeping a tight, friendly register.
+  "Wybierz sesję z listy." → "Pick a session to start."; "Szukaj w
+  sesji…" → "Search in session…"; "Pauza"/"Odtwarzaj" → "Pause"/
+  "Play"; "Prędkość odtwarzania" → "Playback speed"; "Brak wywołań
+  narzędzi." → "No tool calls."; "Zamknij zakładkę" → "Close tab";
+  "Nowa zakładka" → "New tab"; "Limit 16 zakładek" → "16-tab limit
+  reached"; "Zapisano bufor terminala" → "Terminal buffer saved";
+  "Skróty klawiaturowe" → "Keyboard shortcuts"; plural `{n} sesji` →
+  `{n} sessions` (English allows simple -s; accept the corner case of
+  "1 sessions" for now — fix with Intl.PluralRules later if needed).
+- **Security:** no new string reaches `dangerouslySetInnerHTML`,
+  `innerHTML`, or `document.write`. Toasts use `sonner` which
+  text-escapes by default — still verify no HTML markup is passed.
+- **DoD:** `rg -e '[ąćęłńóśźż]' app/ components/` returns 0 matches.
+  All 408+ unit tests green (component tests asserting Polish labels
+  get updated together). New `tests/unit/i18n/no-polish.test.ts`
+  programmatically greps the codebase and fails on any match — acts
+  as a CI guard-rail. Snapshots (if any) updated deliberately.
+
+### T28 — Translate Polish code comments to English
+
+- [ ] **Goal:** remove every Polish-language comment from the
+  codebase so maintainers who don't read Polish can still reason
+  about the code.
+- **Touch:** every file surfaced by `rg -e '[ąćęłńóśźż]' lib/ tests/
+  hooks/ stores/ app/api` whose match falls inside a `//` or `/** */`
+  comment. Starting set from audit: `lib/security/host-check.ts`,
+  `tests/e2e/phase-2-smoke.spec.ts` (≈11 comments total).
+- **Logic:** translations keep the *reason* not a line-by-line gloss.
+  When a comment merely restates the code, delete it. Do not touch
+  code identifiers or logic.
+- **Security:** `git diff` review before commit: confirm only comment
+  lines changed. Any code change inside this task is a bug and must
+  be pulled into a separate commit with its own tests.
+- **DoD:** `rg -e '[ąćęłńóśźż]' lib/ tests/ hooks/ stores/ app/api`
+  returns 0 matches. `pnpm typecheck && pnpm lint && pnpm test:unit`
+  still green.
+
+### T29 — Update README + docs + platform metadata
+
+- [ ] **Goal:** public documentation in English, accurately reflects
+  Linux + macOS support and the Node-based installer.
+- **Touch:** `README.md` (notably line 174 "macOS out of scope");
+  `docs/ARCHITECTURE.md`, `docs/SECURITY.md`, `docs/PHASE-0.md` …
+  `docs/PHASE-7.md` (translate any Polish fragments found);
+  `CLAUDE.md` (repo-level — only the project instructions, not any
+  user-specific language preferences).
+- **Logic:** remove "macOS out of scope for v1"; add "Platform
+  support: Linux + macOS. Windows: use WSL." Install section uses
+  `npx claude-ui-install` with a manual-clone fallback (`git clone`
+  + `node bin/install.ts`). Never suggest `curl ... | bash` from
+  unofficial sources.
+- **Security:** no live tokens, credentials, or internal URLs in
+  examples. Install instructions must route through npm/pnpm or a
+  reviewed script — no shell one-liners from untrusted hosts.
+- **DoD:** `rg -e '[ąćęłńóśźż]' README.md docs/` returns 0 matches.
+  Full README read-through is accurate: clone → install → run works
+  on a fresh machine. No dangling Polish references in user-facing
+  docs. Cross-cutting security gates from `PLATFORM_I18N_PLAN.md`
+  (audit, CSP, Host/Origin, rate limits, profile mode 0700) all
+  green before this task closes.
+
 ---
 
 ## How the scheduler consumes this file
