@@ -2,8 +2,12 @@
 
 import { useState } from 'react';
 import type { JsonlEvent } from '@/lib/jsonl/types';
+import type { DiffToolUse } from '@/lib/jsonl/tool-pairs';
 import { Markdown } from './Markdown';
 import { CodeBlock } from './CodeBlock';
+import { DiffView } from './DiffView';
+
+export type ToolUseRegistry = ReadonlyMap<string, DiffToolUse>;
 
 const MAX_RENDER_BYTES = 10_000_000;
 
@@ -100,7 +104,15 @@ function Wrapper({
   );
 }
 
-function Blocks({ blocks, markdown }: { blocks: ContentBlock[]; markdown: boolean }) {
+function Blocks({
+  blocks,
+  markdown,
+  registry,
+}: {
+  blocks: ContentBlock[];
+  markdown: boolean;
+  registry?: ToolUseRegistry | undefined;
+}) {
   return (
     <div className="flex flex-col gap-3">
       {blocks.map((b, i) => {
@@ -139,7 +151,15 @@ function Blocks({ blocks, markdown }: { blocks: ContentBlock[]; markdown: boolea
         if (b.kind === 'tool_use') {
           return <ToolUseBlock key={i} name={b.name} input={b.input} />;
         }
-        return <ToolResultBlock key={i} text={b.text} isError={b.isError} />;
+        const diff = b.toolUseId ? registry?.get(b.toolUseId) : undefined;
+        return (
+          <ToolResultBlock
+            key={i}
+            text={b.text}
+            isError={b.isError}
+            diff={diff ?? null}
+          />
+        );
       })}
     </div>
   );
@@ -169,11 +189,30 @@ function ToolUseBlock({ name, input }: { name: string; input: unknown }) {
   );
 }
 
-function ToolResultBlock({ text, isError }: { text: string; isError: boolean }) {
-  const [open, setOpen] = useState(false);
+function ToolResultBlock({
+  text,
+  isError,
+  diff,
+}: {
+  text: string;
+  isError: boolean;
+  diff: DiffToolUse | null;
+}) {
+  const [open, setOpen] = useState(diff !== null && !isError);
   const { text: safe, truncated } = truncate(text);
   const oneLine = safe.replace(/\s+/g, ' ').slice(0, 180);
   const tone = isError ? 'border-red-900/60 bg-red-950/20' : 'border-sky-900/60 bg-sky-950/10';
+  const showDiff = diff !== null && !isError;
+  const summary = showDiff
+    ? `${diff.name}${diff.filePath ? ` · ${diff.filePath}` : ''}`
+    : oneLine;
+  const headerLabel = showDiff
+    ? isError
+      ? 'tool_result · diff · error'
+      : 'tool_result · diff'
+    : isError
+      ? 'tool_result · error'
+      : 'tool_result';
   return (
     <div className={`rounded-md border ${tone}`}>
       <button
@@ -187,34 +226,57 @@ function ToolResultBlock({ text, isError }: { text: string; isError: boolean }) 
             isError ? 'text-red-300' : 'text-sky-300'
           }`}
         >
-          {isError ? 'tool_result · error' : 'tool_result'}
+          {headerLabel}
         </span>
-        {!open && <span className="truncate font-mono text-neutral-500">{oneLine}</span>}
+        {!open && <span className="truncate font-mono text-neutral-500">{summary}</span>}
       </button>
       {open && (
         <div className="border-t border-neutral-800 px-3 pb-3 pt-2">
-          <CodeBlock code={safe} lang="text" />
-          {truncated && <TruncatedHint />}
+          {showDiff ? (
+            <DiffView
+              oldText={diff.oldText}
+              newText={diff.newText}
+              filePath={diff.filePath}
+              label={diff.name}
+            />
+          ) : (
+            <>
+              <CodeBlock code={safe} lang="text" />
+              {truncated && <TruncatedHint />}
+            </>
+          )}
         </div>
       )}
     </div>
   );
 }
 
-export function UserMsg({ ev }: { ev: Extract<JsonlEvent, { type: 'user' }> }) {
+export function UserMsg({
+  ev,
+  registry,
+}: {
+  ev: Extract<JsonlEvent, { type: 'user' }>;
+  registry?: ToolUseRegistry | undefined;
+}) {
   const blocks = splitBlocks(ev.message.content);
   return (
     <Wrapper role="user" color="text-blue-400">
-      <Blocks blocks={blocks} markdown={false} />
+      <Blocks blocks={blocks} markdown={false} registry={registry} />
     </Wrapper>
   );
 }
 
-export function AssistantMsg({ ev }: { ev: Extract<JsonlEvent, { type: 'assistant' }> }) {
+export function AssistantMsg({
+  ev,
+  registry,
+}: {
+  ev: Extract<JsonlEvent, { type: 'assistant' }>;
+  registry?: ToolUseRegistry | undefined;
+}) {
   const blocks = splitBlocks(ev.message.content);
   return (
     <Wrapper role="assistant" color="text-emerald-400">
-      <Blocks blocks={blocks} markdown={true} />
+      <Blocks blocks={blocks} markdown={true} registry={registry} />
     </Wrapper>
   );
 }
@@ -347,12 +409,12 @@ export function FileHistoryMsg(_props: {
   );
 }
 
-export function renderEvent(ev: JsonlEvent, key: number) {
+export function renderEvent(ev: JsonlEvent, key: number, registry?: ToolUseRegistry) {
   switch (ev.type) {
     case 'user':
-      return <UserMsg key={key} ev={ev} />;
+      return <UserMsg key={key} ev={ev} registry={registry} />;
     case 'assistant':
-      return <AssistantMsg key={key} ev={ev} />;
+      return <AssistantMsg key={key} ev={ev} registry={registry} />;
     case 'tool_use':
       return <ToolUseMsg key={key} ev={ev} />;
     case 'tool_result':

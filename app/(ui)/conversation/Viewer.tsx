@@ -16,6 +16,7 @@ import {
   EVENT_CATEGORIES as ALL_CATEGORIES,
   type EventCategory as Category,
 } from '@/lib/jsonl/outline';
+import { buildToolUseRegistry } from '@/lib/jsonl/tool-pairs';
 import { Outline } from './Outline';
 import { StatsBar } from './StatsBar';
 
@@ -46,6 +47,8 @@ export function Viewer() {
     for (const ev of events) counts[categorize(ev)]++;
     return counts;
   }, [events]);
+
+  const toolUseRegistry = useMemo(() => buildToolUseRegistry(events), [events]);
 
   // Hit-set used both for navigation and for "only hits" mode.
   const hits = useMemo(() => searchInEvents(events, query, { limit: 500 }), [events, query]);
@@ -222,7 +225,9 @@ export function Viewer() {
                 setVisibleRange({ start: startIndex, end: endIndex })
               }
               itemContent={(index, pair) => (
-                <div className="px-4 py-1.5">{renderEvent(pair.ev, pair.origIndex)}</div>
+                <div className="px-4 py-1.5">
+                  {renderEvent(pair.ev, pair.origIndex, toolUseRegistry)}
+                </div>
               )}
             />
           )}
