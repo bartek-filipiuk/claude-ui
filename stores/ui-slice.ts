@@ -1,7 +1,14 @@
 import { create } from 'zustand';
-import { isSortMode, loadLayout, patchLayout, type SortMode } from '@/lib/ui/layout-storage';
+import {
+  isProjectGrouping,
+  isSortMode,
+  loadLayout,
+  patchLayout,
+  type ProjectGrouping,
+  type SortMode,
+} from '@/lib/ui/layout-storage';
 
-export type { SortMode };
+export type { SortMode, ProjectGrouping };
 
 interface UiState {
   selectedProjectSlug: string | null;
@@ -13,6 +20,8 @@ interface UiState {
   /** One-shot: Viewer consumes this, scrolls to the event, and clears it. */
   pendingEventIndex: number | null;
   sortMode: SortMode;
+  projectGrouping: ProjectGrouping;
+  groupOpen: Record<string, boolean>;
   setSelectedProject: (slug: string | null) => void;
   setSelectedSession: (id: string | null) => void;
   setSearch: (q: string) => void;
@@ -23,9 +32,12 @@ interface UiState {
   jumpToEvent: (index: number) => void;
   consumePendingEvent: () => void;
   setSortMode: (mode: SortMode) => void;
+  setProjectGrouping: (mode: ProjectGrouping) => void;
+  toggleGroupOpen: (key: string) => void;
 }
 
 const DEFAULT_SORT: SortMode = 'activity';
+const DEFAULT_GROUPING: ProjectGrouping = 'flat';
 
 function initialSortMode(): SortMode {
   if (typeof window === 'undefined') return DEFAULT_SORT;
@@ -33,7 +45,18 @@ function initialSortMode(): SortMode {
   return isSortMode(stored) ? stored : DEFAULT_SORT;
 }
 
-export const useUiStore = create<UiState>((set) => ({
+function initialProjectGrouping(): ProjectGrouping {
+  if (typeof window === 'undefined') return DEFAULT_GROUPING;
+  const stored = loadLayout().projectGrouping;
+  return isProjectGrouping(stored) ? stored : DEFAULT_GROUPING;
+}
+
+function initialGroupOpen(): Record<string, boolean> {
+  if (typeof window === 'undefined') return {};
+  return loadLayout().groupOpen ?? {};
+}
+
+export const useUiStore = create<UiState>((set, get) => ({
   selectedProjectSlug: null,
   selectedSessionId: null,
   search: '',
@@ -42,6 +65,8 @@ export const useUiStore = create<UiState>((set) => ({
   editorOpen: false,
   pendingEventIndex: null,
   sortMode: initialSortMode(),
+  projectGrouping: initialProjectGrouping(),
+  groupOpen: initialGroupOpen(),
   setSelectedProject: (slug) =>
     set(() => ({
       selectedProjectSlug: slug,
@@ -61,5 +86,17 @@ export const useUiStore = create<UiState>((set) => ({
   setSortMode: (mode) => {
     patchLayout({ sortMode: mode });
     set({ sortMode: mode });
+  },
+  setProjectGrouping: (mode) => {
+    patchLayout({ projectGrouping: mode });
+    set({ projectGrouping: mode });
+  },
+  toggleGroupOpen: (key) => {
+    const current = get().groupOpen;
+    const prev = current[key];
+    const nextValue = prev === false ? true : false;
+    const next = { ...current, [key]: nextValue };
+    patchLayout({ groupOpen: next });
+    set({ groupOpen: next });
   },
 }));

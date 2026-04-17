@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { Star } from 'lucide-react';
+import { ChevronDown, ChevronRight, Star } from 'lucide-react';
 import { useProjects, type ProjectSummary } from '@/hooks/use-projects';
 import {
   useProjectMeta,
@@ -17,6 +17,7 @@ import { Select } from '@/components/ui/select';
 import { timeAgo } from '@/lib/ui/format';
 import { formatUsd } from '@/lib/jsonl/usage';
 import { isSortMode, type SortMode } from '@/lib/ui/layout-storage';
+import { groupProjectsByPrefix, type ProjectGroup } from '@/lib/projects/group-by-prefix';
 import { cn } from '@/lib/utils';
 
 export function ProjectList() {
@@ -28,10 +29,19 @@ export function ProjectList() {
   const setSelected = useUiStore((s) => s.setSelectedProject);
   const sortMode = useUiStore((s) => s.sortMode);
   const setSortMode = useUiStore((s) => s.setSortMode);
+  const projectGrouping = useUiStore((s) => s.projectGrouping);
+  const setProjectGrouping = useUiStore((s) => s.setProjectGrouping);
+  const groupOpen = useUiStore((s) => s.groupOpen);
+  const toggleGroupOpen = useUiStore((s) => s.toggleGroupOpen);
 
   const visible = useMemo(
     () => filterAndSortProjects(data ?? [], meta ?? {}, search, sortMode),
     [data, meta, search, sortMode],
+  );
+
+  const groups = useMemo(
+    () => (projectGrouping === 'prefix' ? groupProjectsByPrefix(visible, meta ?? {}) : null),
+    [projectGrouping, visible, meta],
   );
 
   const { data: selectedSessions } = useSessions(selectedSlug);
@@ -52,49 +62,119 @@ export function ProjectList() {
   if (isError) return <ErrorState onRetry={() => refetch()} />;
   if (!data || data.length === 0) return <EmptyState />;
 
+  const renderItem = (p: ProjectSummary) => {
+    const entry = meta?.[p.slug];
+    const isActive = p.slug === selectedSlug;
+    return (
+      <ProjectItem
+        key={p.slug}
+        project={p}
+        alias={entry?.alias}
+        favorite={entry?.favorite === true}
+        active={isActive}
+        costUsd={isActive ? selectedCost : null}
+        onSelect={() => setSelected(p.slug)}
+        onToggleFavorite={() => {
+          setMeta.mutate({
+            slug: p.slug,
+            favorite: entry?.favorite !== true,
+          });
+        }}
+      />
+    );
+  };
+
   return (
     <ScrollArea className="h-full">
-      <div className="flex items-center justify-between px-3 pb-1 pt-2">
+      <div className="flex items-center justify-between gap-2 px-3 pb-1 pt-2">
         <span className="text-[10px] uppercase tracking-wider text-neutral-500">Sortuj</span>
-        <Select
-          aria-label="Sortowanie projektów"
-          value={sortMode}
-          onChange={(e) => {
-            const next = e.target.value;
-            if (isSortMode(next)) setSortMode(next);
-          }}
-        >
-          <option value="activity">Ostatnia aktywność</option>
-          <option value="name">Nazwa</option>
-          <option value="sessions">Liczba sesji</option>
-        </Select>
+        <div className="flex items-center gap-2">
+          <div
+            role="group"
+            aria-label="Project grouping"
+            className="inline-flex overflow-hidden rounded border border-neutral-800 text-[10px]"
+          >
+            <button
+              type="button"
+              aria-pressed={projectGrouping === 'flat'}
+              onClick={() => setProjectGrouping('flat')}
+              className={cn(
+                'px-2 py-0.5 uppercase tracking-wider',
+                projectGrouping === 'flat'
+                  ? 'bg-neutral-700 text-neutral-100'
+                  : 'text-neutral-400 hover:text-neutral-200',
+              )}
+            >
+              Flat
+            </button>
+            <button
+              type="button"
+              aria-pressed={projectGrouping === 'prefix'}
+              onClick={() => setProjectGrouping('prefix')}
+              className={cn(
+                'px-2 py-0.5 uppercase tracking-wider',
+                projectGrouping === 'prefix'
+                  ? 'bg-neutral-700 text-neutral-100'
+                  : 'text-neutral-400 hover:text-neutral-200',
+              )}
+            >
+              By folder
+            </button>
+          </div>
+          <Select
+            aria-label="Sortowanie projektów"
+            value={sortMode}
+            onChange={(e) => {
+              const next = e.target.value;
+              if (isSortMode(next)) setSortMode(next);
+            }}
+          >
+            <option value="activity">Ostatnia aktywność</option>
+            <option value="name">Nazwa</option>
+            <option value="sessions">Liczba sesji</option>
+          </Select>
+        </div>
       </div>
-      <ul className="flex flex-col gap-0.5 p-2" role="list">
-        {visible.map((p) => {
-          const entry = meta?.[p.slug];
-          const isActive = p.slug === selectedSlug;
-          return (
-            <ProjectItem
-              key={p.slug}
-              project={p}
-              alias={entry?.alias}
-              favorite={entry?.favorite === true}
-              active={isActive}
-              costUsd={isActive ? selectedCost : null}
-              onSelect={() => setSelected(p.slug)}
-              onToggleFavorite={() => {
-                setMeta.mutate({
-                  slug: p.slug,
-                  favorite: entry?.favorite !== true,
-                });
-              }}
-            />
-          );
-        })}
-        {visible.length === 0 && (
-          <li className="px-3 py-6 text-center text-xs text-neutral-500">Brak dopasowań.</li>
-        )}
-      </ul>
+      {groups ? (
+        <div className="flex flex-col gap-1 p-2">
+          {groups.map((group) => {
+            const isOpen = groupOpen[group.key] !== false;
+            return (
+              <section key={group.key}>
+                <button
+                  type="button"
+                  onClick={() => toggleGroupOpen(group.key)}
+                  aria-expanded={isOpen}
+                  className="flex w-full items-center gap-1 rounded px-2 py-1 text-left text-[10px] uppercase tracking-wider text-neutral-400 hover:bg-neutral-900 hover:text-neutral-200"
+                >
+                  {isOpen ? (
+                    <ChevronDown className="h-3 w-3" aria-hidden />
+                  ) : (
+                    <ChevronRight className="h-3 w-3" aria-hidden />
+                  )}
+                  <span className="flex-1 truncate">{group.label}</span>
+                  <span className="tabular-nums text-neutral-500">{group.projects.length}</span>
+                </button>
+                {isOpen && (
+                  <ul className="flex flex-col gap-0.5 pl-1" role="list">
+                    {group.projects.map(renderItem)}
+                  </ul>
+                )}
+              </section>
+            );
+          })}
+          {visible.length === 0 && (
+            <p className="px-3 py-6 text-center text-xs text-neutral-500">Brak dopasowań.</p>
+          )}
+        </div>
+      ) : (
+        <ul className="flex flex-col gap-0.5 p-2" role="list">
+          {visible.map(renderItem)}
+          {visible.length === 0 && (
+            <li className="px-3 py-6 text-center text-xs text-neutral-500">Brak dopasowań.</li>
+          )}
+        </ul>
+      )}
     </ScrollArea>
   );
 }
@@ -140,6 +220,8 @@ export function filterAndSortProjects(
   });
   return filtered;
 }
+
+export type { ProjectGroup };
 
 function ProjectItem({
   project,
