@@ -243,7 +243,7 @@ next `[ ]`. Never reorder or delete tasks — only check them off.
 
 ### T18 — Project grouping by path prefix
 
-- [ ] **Goal:** sidebar toggle "Flat / By folder". Grouped view collapses
+- [x] **Goal:** sidebar toggle "Flat / By folder". Grouped view collapses
   projects by first path segment under `$HOME` (e.g. `main-projects/`,
   `client-projects/`, `experiments/`). Pinned (favorite) projects stay
   at the very top as their own group.
