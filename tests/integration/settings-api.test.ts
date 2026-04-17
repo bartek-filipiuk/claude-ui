@@ -46,7 +46,8 @@ describe('GET /api/settings', () => {
     const res = await fetch(`${server.baseUrl}/api/settings`, {
       headers: { Cookie: authCookie },
     });
-    expect(res.headers.get('cache-control')).toBe('no-store');
+    // Next.js 15 appends `must-revalidate` to `no-store` for dynamic routes.
+    expect(res.headers.get('cache-control')).toMatch(/^no-store(,.*)?$/);
   });
 });
 
