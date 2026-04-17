@@ -210,6 +210,132 @@ next `[ ]`. Never reorder or delete tasks — only check them off.
 - **DoD:** starts from first event, pause works, scrubbing sets the
   revealed event count. Follow mode disabled while replay is active.
 
+### T16 — Default event-category filters
+
+- [ ] **Goal:** persist which categories (user/assistant/tools/system)
+  start hidden when a session is opened. Today user clicks chips every
+  time; power users almost always want Tools off by default.
+- **Touch:** extend `Settings` in `lib/settings/types.ts` with
+  `hiddenCategories: EventCategory[]` (default `[]`), expose in
+  `components/SettingsDialog.tsx` as a row of four toggles. Seed
+  `hidden` in `Viewer.tsx` from settings on mount.
+- **Logic:** settings is the canonical default; user can still toggle
+  chips during the session without writing back (session-local override).
+  Zod validates the array against the `EVENT_CATEGORIES` literal set.
+- **DoD:** unit test for `applyDefaults` accepting + rejecting category
+  names, SettingsDialog toggles write through, opening a new session
+  respects the setting. No perf regression (initial state only).
+
+### T17 — Timestamp display format
+
+- [ ] **Goal:** three formats for the small timestamp badge under each
+  event: `relative` ("2 min temu"), `iso` ("2026-04-16T12:00:00Z"),
+  `local` ("14:00:05", 24h). Chosen in Settings.
+- **Touch:** new `lib/jsonl/format-timestamp.ts` with pure function
+  `formatTimestamp(iso, mode, now)`. Extend `Settings` with
+  `timestampFormat`. Use it in `components/conversation/messages.tsx`
+  wherever a `<time>` is rendered.
+- **Logic:** relative uses `Intl.RelativeTimeFormat('pl')`. ISO passes
+  through. Local uses `toLocaleTimeString` with `hour12: false`.
+  Invalid input returns empty string (no throw).
+- **DoD:** unit tests cover all three modes + invalid input. Settings
+  toggle visibly changes existing session without reload.
+
+### T18 — Project grouping by path prefix
+
+- [ ] **Goal:** sidebar toggle "Flat / By folder". Grouped view collapses
+  projects by first path segment under `$HOME` (e.g. `main-projects/`,
+  `client-projects/`, `experiments/`). Pinned (favorite) projects stay
+  at the very top as their own group.
+- **Touch:** `app/(ui)/sidebar/ProjectList.tsx`, `stores/ui-slice.ts`
+  (add `projectGrouping: 'flat' | 'prefix'`, persisted via
+  `patchLayout`). New helper `lib/projects/group-by-prefix.ts`.
+- **Logic:** group key derived from `resolvedCwd` relative to `$HOME`;
+  null/absent cwd → "Inne". Group header shows count and collapses
+  on click (localStorage per-group open state). Within a group the
+  existing sort mode applies.
+- **DoD:** unit test for the grouper (3 scenarios incl. no-cwd), toggle
+  persists across restart, favorites pinning still works regardless
+  of grouping mode.
+
+### T19 — Terminal quick-actions row
+
+- [ ] **Goal:** narrow row above the active `<Terminal />` with buttons
+  for predefined shell commands (global preset in Settings). Click
+  types the command into the PTY and submits it.
+- **Touch:** new `app/(ui)/terminal/QuickActions.tsx`, `Settings` gains
+  `terminalQuickActions: { label: string, command: string }[]` with
+  defaults (`git status`, `git log --oneline -10`, `pnpm test`,
+  `pnpm dev`). Settings dialog row for editing the list (add / remove
+  / reorder).
+- **Logic:** action dispatch goes through the existing PTY write path
+  of the active tab — buttons disabled when PTY status != `ready`.
+  Command is plain text ending with `\r` so shell executes it.
+- **DoD:** unit test for the reducer that edits the action list. E2E
+  smoke (no new Playwright unless trivial): manual verification that
+  clicking "git status" runs it. Buttons hidden when no tabs open.
+
+### T20 — Parent tool_use popover
+
+- [ ] **Goal:** clicking anywhere inside a rendered `tool_result`
+  opens a small popover showing the linked `tool_use` (tool name +
+  args, pretty-printed JSON, wrapped). Closes on outside click / Esc.
+- **Touch:** `components/conversation/messages.tsx` — wrap the existing
+  ToolResult renderer in `@radix-ui/react-popover`. Use the already-built
+  `buildToolUseRegistry`. Lazy-render popover content on open.
+- **Logic:** if the registry has no parent (orphaned result), popover
+  shows a disabled state "Brak powiązanego tool_use". Arg rendering
+  truncates at 10 kB with "show more".
+- **DoD:** popover opens on click, renders args, closes on Esc. Unit
+  test for the registry lookup fallback. No perf hit during scroll
+  (content only mounts on open).
+
+### T21 — Diff-before-save in CLAUDE.md editor
+
+- [ ] **Goal:** in the editor header, a "Pokaż diff" button opens a
+  modal showing the colored diff between current buffer and what's on
+  disk. Save button inside the modal confirms the write.
+- **Touch:** `app/(ui)/editor/MarkdownEditor.tsx`, reuse existing
+  `components/conversation/DiffView.tsx` from T10. Fetch disk content
+  through the already-returned `GET /api/claude-md` payload.
+- **Logic:** diff computed only on button click (pure compute, cached
+  until buffer changes). If no changes, modal shows "Brak zmian" and
+  Save is disabled.
+- **DoD:** modal renders hunks for a 100-line file, Ctrl+S still saves
+  without opening modal, Save inside modal triggers the same PUT path.
+  Unit test for "no changes" state.
+
+### T22 — Recent CLAUDE.md files dropdown
+
+- [ ] **Goal:** dropdown in editor header listing last 10 opened
+  CLAUDE.md paths (mixed global + per-project). Click opens that file
+  in the editor.
+- **Touch:** new `lib/ui/recent-files.ts` (localStorage-backed, key
+  `claude-ui:recent-md`, capped at 10). Hook `use-recent-files.ts`.
+  `MarkdownEditor.tsx` header gains a compact Select.
+- **Logic:** open pushes to front, duplicates collapse, LRU trim. Paths
+  stored as `{ kind: 'global' | 'project', slug?: string, label }`.
+  Dropdown hidden if list is empty.
+- **DoD:** opening 3 files populates list in LRU order, restart keeps
+  them, click re-opens. Unit test for the LRU reducer (push + trim).
+
+### T23 — Git branch badge in terminal header
+
+- [ ] **Goal:** show current branch + dirty flag next to the cwd in
+  terminal header (e.g. `main●` for dirty, `main` for clean). Fetched
+  once per tab open, refresh on manual click of the badge.
+- **Touch:** new `/api/git/status` (query param `cwd`, path-guarded to
+  `$HOME`, rate-limited 30/min), runs `git rev-parse --abbrev-ref HEAD`
+  + `git status --porcelain -z --untracked-files=no` with a 2 s timeout.
+  `Terminal.tsx` header fetches on mount. Not inside a repo → badge
+  hidden.
+- **Logic:** endpoint returns `{ branch: string | null, dirty: boolean }`.
+  No polling. Errors swallowed to null → badge hidden. Command uses
+  `child_process.execFile` (array args), never shell.
+- **DoD:** badge shows in a repo tab, hidden outside a repo, click
+  refreshes within 500 ms. Integration test for the endpoint (happy
+  path + path outside $HOME → 403 + timeout → 504). No background work.
+
 ---
 
 ## How the scheduler consumes this file
