@@ -4,7 +4,8 @@
   "private": true,
   "description": "Local web UI for managing Claude Code CLI sessions",
   "bin": {
-    "claude-ui": "./bin/claude-ui"
+    "claude-ui": "./bin/claude-ui",
+    "claude-ui-install": "./bin/install.ts"
   },
   "scripts": {
     "dev": "tsx server.ts",
