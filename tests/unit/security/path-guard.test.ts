@@ -23,23 +23,23 @@ afterAll(async () => {
 });
 
 describe('assertInside — happy path', () => {
-  it('akceptuje plik bezpośrednio w root', async () => {
+  it('accepts a file directly in root', async () => {
     const resolved = await assertInside(ROOT, join(ROOT, 'legit.txt'));
     expect(resolved).toBe(join(ROOT, 'legit.txt'));
   });
 
-  it('akceptuje plik w podkatalogu', async () => {
+  it('accepts a file inside a subdirectory', async () => {
     const resolved = await assertInside(ROOT, join(ROOT, 'subdir', 'nested.txt'));
     expect(resolved).toBe(join(ROOT, 'subdir', 'nested.txt'));
   });
 
-  it('akceptuje sam root', async () => {
+  it('accepts the root itself', async () => {
     const resolved = await assertInside(ROOT, ROOT);
     expect(resolved).toBe(ROOT);
   });
 });
 
-describe('assertInside — fuzz 100 payloadów', () => {
+describe('assertInside — 100-payload fuzz', () => {
   const payloads: { name: string; input: string }[] = [
     // Classic traversal
     ...Array.from({ length: 10 }, (_, i) => ({
@@ -49,7 +49,7 @@ describe('assertInside — fuzz 100 payloadów', () => {
     // URL-encoded traversal
     { name: 'url-encoded ../', input: join(ROOT, '%2e%2e%2f', 'etc', 'passwd') },
     { name: 'double url-encoded', input: join(ROOT, '%252e%252e%252f', 'passwd') },
-    // Null byte injection (Node odrzuca na poziomie fs)
+    // Null byte injection (Node rejects this at the fs layer)
     { name: 'null byte', input: `${ROOT}/legit.txt\0.evil` },
     // UTF-8 tricks
     { name: 'fullwidth dot', input: join(ROOT, '．．', 'etc') },
@@ -57,7 +57,7 @@ describe('assertInside — fuzz 100 payloadów', () => {
     // Absolute paths out
     { name: 'absolute /etc/passwd', input: '/etc/passwd' },
     { name: 'absolute HOME', input: '/root/.ssh/id_rsa' },
-    // Mixed case (nieistotne na Linux, ale niech waliduje)
+    // Mixed case (a no-op on Linux, but validated anyway)
     { name: 'CASE root', input: ROOT.toUpperCase() },
     // Prefix collision
     { name: 'prefix collision', input: `${ROOT}EVIL/file` },
@@ -73,13 +73,13 @@ describe('assertInside — fuzz 100 payloadów', () => {
     // Trailing separator tricks
     { name: 'trailing slash', input: `${ROOT}/../outside/secret.txt` },
     { name: 'double slash', input: `${ROOT}//../outside/secret.txt` },
-    // Backslashes (nie-Linux, ale waliduj)
+    // Backslashes (non-Linux idiom — still validated)
     { name: 'backslash traversal', input: `${ROOT}\\..\\outside\\secret.txt` },
     // Concurrent ../
     { name: 'multi ../', input: join(ROOT, 'subdir', '..', '..', 'outside', 'secret.txt') },
   ];
 
-  // Każdy z tych payloadów MUSI dawać ścieżkę poza ROOT po join/resolve.
+  // Every payload below MUST resolve outside ROOT after join/resolve.
   const ESCAPING = [
     '..',
     '../',
@@ -94,7 +94,7 @@ describe('assertInside — fuzz 100 payloadów', () => {
     'subdir/../../outside',
     'subdir/../../outside/secret.txt',
   ];
-  // Plus absolutne ścieżki outside (nie używamy join).
+  // Plus absolute paths outside (not joined with ROOT).
   const ABSOLUTE_OUT = [
     '/etc/passwd',
     '/etc',
@@ -115,13 +115,13 @@ describe('assertInside — fuzz 100 payloadów', () => {
     payloads.push({ name: `abs: ${abs}`, input: abs });
   }
 
-  it.each(payloads)('odrzuca: $name', async ({ input }) => {
+  it.each(payloads)('rejects: $name', async ({ input }) => {
     await expect(assertInside(ROOT, input)).rejects.toThrow();
   });
 });
 
 describe('assertInside — prefix collision', () => {
-  it('odrzuca katalog o nazwie zaczynającej się tak samo jak root', async () => {
+  it('rejects a directory whose name shares the root prefix', async () => {
     const evilRoot = `${ROOT}EVIL`;
     await mkdir(evilRoot, { recursive: true });
     await writeFile(join(evilRoot, 'x.txt'), 'x');

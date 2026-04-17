@@ -129,7 +129,7 @@ test.beforeEach(async ({ page }) => {
   expect(res.status()).toBe(200);
 });
 
-test('3 zakładki shella, przełączanie, zamknięcie', async ({ page }) => {
+test('3 shell tabs, switching, closing', async ({ page }) => {
   await page.goto(`http://127.0.0.1:${port}/`);
 
   // Wait until the project list renders — it contains buttons with "/alpha"
@@ -168,6 +168,6 @@ test('3 zakładki shella, przełączanie, zamknięcie', async ({ page }) => {
   await expect(tabs.nth(0)).toHaveAttribute('aria-selected', 'true');
 
   // Close middle tab via × button.
-  await tabs.nth(1).getByRole('button', { name: 'Zamknij zakładkę' }).click();
+  await tabs.nth(1).getByRole('button', { name: 'Close tab' }).click();
   await expect(page.getByRole('tab')).toHaveCount(2);
 });

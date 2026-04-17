@@ -119,7 +119,7 @@ test.beforeEach(async ({ page }) => {
   expect(res.status()).toBe(200);
 });
 
-test('otwieram terminal → widzę output shella', async ({ page }) => {
+test('opening the terminal shows shell output', async ({ page }) => {
   await page.goto(`http://127.0.0.1:${port}/`);
   await page.locator('aside button').filter({ hasText: /proj/ }).first().click();
   await page.getByRole('button', { name: '+ shell' }).click();
@@ -133,11 +133,11 @@ test('otwieram terminal → widzę output shella', async ({ page }) => {
   });
 });
 
-test('zamknięcie terminala przywraca viewer', async ({ page }) => {
+test('closing the terminal restores the viewer', async ({ page }) => {
   await page.goto(`http://127.0.0.1:${port}/`);
   await page.locator('aside button').filter({ hasText: /proj/ }).first().click();
   await page.getByRole('button', { name: '+ shell' }).click();
   await expect(page.getByText('ready').first()).toBeVisible({ timeout: 10_000 });
-  await page.getByRole('button', { name: 'Pokaż historię' }).click();
-  await expect(page.getByRole('heading', { name: 'Historia' })).toBeVisible();
+  await page.getByRole('button', { name: 'Show history' }).click();
+  await expect(page.getByRole('heading', { name: 'History' })).toBeVisible();
 });

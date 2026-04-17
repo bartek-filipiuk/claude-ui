@@ -115,7 +115,7 @@ test.beforeEach(async ({ page }) => {
   expect(res.status()).toBe(200);
 });
 
-test('edytuję globalny CLAUDE.md i zapisuję', async ({ page }) => {
+test('edit and save the global CLAUDE.md', async ({ page }) => {
   await page.goto(`http://127.0.0.1:${port}/`);
   await expect(page.locator('aside button').filter({ hasText: /proj/ }).first()).toBeVisible({
     timeout: 20_000,
@@ -143,7 +143,7 @@ test('edytuję globalny CLAUDE.md i zapisuję', async ({ page }) => {
   expect(onDisk).toContain('phase-7-marker');
 });
 
-test('per-project CLAUDE.md pisze do <project>/CLAUDE.md', async ({ page }) => {
+test('per-project CLAUDE.md writes to <project>/CLAUDE.md', async ({ page }) => {
   await page.goto(`http://127.0.0.1:${port}/`);
   await page.locator('aside button').filter({ hasText: /proj/ }).first().click();
   await page.getByRole('button', { name: 'CLAUDE.md' }).click();

@@ -90,7 +90,7 @@ test.beforeEach(async ({ page }) => {
   expect(res.status()).toBe(200);
 });
 
-test('widzę 5 projektów z fixture', async ({ page }) => {
+test('renders 5 fixture projects', async ({ page }) => {
   await page.goto(`http://127.0.0.1:${port}/`);
   // Dev-mode first-compile can take a while — 20s accommodates slow CI.
   await expect(page.getByText('/tmp/alpha')).toBeVisible({ timeout: 20_000 });
@@ -100,28 +100,28 @@ test('widzę 5 projektów z fixture', async ({ page }) => {
   await expect(page.getByText('/tmp/epsilon')).toBeVisible();
 });
 
-test('search filtruje projekty', async ({ page }) => {
+test('search filters the project list', async ({ page }) => {
   await page.goto(`http://127.0.0.1:${port}/`);
-  await page.getByLabel('Szukaj projektu').fill('beta');
+  await page.getByLabel('Search projects').fill('beta');
   await expect(page.getByText('/tmp/beta')).toBeVisible();
   await expect(page.getByText('/tmp/alpha')).toHaveCount(0);
 });
 
-test('klik projekt → pokazuje listę sesji', async ({ page }) => {
+test('clicking a project shows its session list', async ({ page }) => {
   await page.goto(`http://127.0.0.1:${port}/`);
   await page.getByText('/tmp/epsilon').click();
-  // Epsilon ma 3 sesje.
-  await expect(page.getByText('3 wiadomości').first())
+  // Epsilon has 3 sessions.
+  await expect(page.getByText('3 messages').first())
     .toBeHidden({ timeout: 1000 })
     .catch(() => {});
-  // Zamiast tego — 3 kafelki sesji.
-  const cards = page.getByRole('button').filter({ hasText: /wiadomości/ });
+  const cards = page.getByRole('button').filter({ hasText: /messages/ });
   await expect(cards).toHaveCount(3);
 });
 
-test('XSS slug renderowany jako text, nie script', async ({ page }) => {
-  // Slush nie przejdzie walidacji (zawiera `<`), więc nie będzie w listingu —
-  // ale nazwy z gamma mają <script> w message content, co nie trafia do sidebara.
+test('XSS slug is rendered as text, not executed as script', async ({ page }) => {
+  // Slashes won't pass validation (contains `<`), so the slug itself is not
+  // listed — but gamma's messages carry <script> content, which must not
+  // leak into the sidebar either.
   await page.goto(`http://127.0.0.1:${port}/`);
   const alerts: string[] = [];
   page.on('dialog', async (d) => {
@@ -129,7 +129,7 @@ test('XSS slug renderowany jako text, nie script', async ({ page }) => {
     await d.dismiss();
   });
   await page.getByText('/tmp/gamma').click();
-  await expect(page.getByText(/wiadomości/).first()).toBeVisible();
-  // Nie powinno było być żadnego alertu (brak script eval).
+  await expect(page.getByText(/messages/).first()).toBeVisible();
+  // No alert should have fired — the HTML parser must not eval injected scripts.
   expect(alerts).toHaveLength(0);
 });

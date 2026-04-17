@@ -24,12 +24,12 @@ afterAll(async () => {
 });
 
 describe('GET /api/projects', () => {
-  it('401 bez auth cookie', async () => {
+  it('401 without an auth cookie', async () => {
     const res = await fetch(`${server.baseUrl}/api/projects`);
     expect(res.status).toBe(401);
   });
 
-  it('zwraca 5 projektów z fake-home', async () => {
+  it('returns 5 projects from the fake-home fixture', async () => {
     const res = await fetch(`${server.baseUrl}/api/projects`, {
       headers: { Cookie: authCookies },
     });
@@ -49,7 +49,7 @@ describe('GET /api/projects', () => {
 });
 
 describe('GET /api/projects/[slug]/sessions', () => {
-  it('zwraca sesje dla valid slug', async () => {
+  it('returns sessions for a valid slug', async () => {
     const res = await fetch(`${server.baseUrl}/api/projects/-tmp-epsilon/sessions`, {
       headers: { Cookie: authCookies },
     });
@@ -58,19 +58,19 @@ describe('GET /api/projects/[slug]/sessions', () => {
     expect(body.sessions).toHaveLength(3);
   });
 
-  it('400 dla invalid slug (path traversal)', async () => {
+  it('400 for an invalid slug (path traversal)', async () => {
     const res = await fetch(`${server.baseUrl}/api/projects/..%2F..%2Fetc/sessions`, {
       headers: { Cookie: authCookies },
     });
     expect(res.status).toBe(400);
   });
 
-  it('401 bez cookie', async () => {
+  it('401 without a cookie', async () => {
     const res = await fetch(`${server.baseUrl}/api/projects/-tmp-epsilon/sessions`);
     expect(res.status).toBe(401);
   });
 
-  it('dostarcza preview dla pierwszych 20 sesji', async () => {
+  it('exposes a preview for the first 20 sessions', async () => {
     const res = await fetch(`${server.baseUrl}/api/projects/-tmp-alpha/sessions`, {
       headers: { Cookie: authCookies },
     });
@@ -84,7 +84,7 @@ describe('GET /api/projects/[slug]/sessions', () => {
 });
 
 describe('GET /api/sessions/[id]', () => {
-  it('streamuje JSONL z Content-Type x-ndjson', async () => {
+  it('streams JSONL with Content-Type x-ndjson', async () => {
     const id = '00000000-0000-4000-8000-000000000001';
     const res = await fetch(`${server.baseUrl}/api/sessions/${id}?slug=-tmp-alpha`, {
       headers: { Cookie: authCookies },
@@ -93,11 +93,11 @@ describe('GET /api/sessions/[id]', () => {
     expect(res.headers.get('content-type')).toContain('application/x-ndjson');
     const body = await res.text();
     const lines = body.split('\n').filter(Boolean);
-    // Fixture ma 10 poprawnych linii + 1 malformed — endpoint streamuje raw, bez filtracji.
+    // Fixture has 10 well-formed lines + 1 malformed; the endpoint streams raw without filtering.
     expect(lines.length).toBeGreaterThanOrEqual(10);
   });
 
-  it('400 dla invalid slug', async () => {
+  it('400 for an invalid slug', async () => {
     const res = await fetch(
       `${server.baseUrl}/api/sessions/00000000-0000-4000-8000-000000000001?slug=../evil`,
       { headers: { Cookie: authCookies } },
@@ -105,14 +105,14 @@ describe('GET /api/sessions/[id]', () => {
     expect(res.status).toBe(400);
   });
 
-  it('400 dla invalid sessionId', async () => {
+  it('400 for an invalid sessionId', async () => {
     const res = await fetch(`${server.baseUrl}/api/sessions/<script>?slug=-tmp-alpha`, {
       headers: { Cookie: authCookies },
     });
     expect(res.status).toBe(400);
   });
 
-  it('404 dla nieistniejącego sessionId', async () => {
+  it('404 for a missing sessionId', async () => {
     const res = await fetch(
       `${server.baseUrl}/api/sessions/ffffffff-ffff-4fff-8fff-ffffffffffff?slug=-tmp-alpha`,
       { headers: { Cookie: authCookies } },
@@ -122,7 +122,7 @@ describe('GET /api/sessions/[id]', () => {
 });
 
 describe('GET /api/sessions/[id]/export', () => {
-  it('zwraca Markdown z Content-Disposition attachment', async () => {
+  it('returns Markdown with a Content-Disposition attachment', async () => {
     const id = '00000000-0000-4000-8000-000000000001';
     const res = await fetch(`${server.baseUrl}/api/sessions/${id}/export?slug=-tmp-alpha`, {
       headers: { Cookie: authCookies },

@@ -61,7 +61,7 @@ const authHeaders = (extra: Record<string, string> = {}) => ({
 });
 
 describe('GET /api/claude-md (global)', () => {
-  it('zwraca pusty doc gdy brak pliku', async () => {
+  it('returns an empty doc when no file exists', async () => {
     const res = await fetch(`${server.baseUrl}/api/claude-md`, { headers: { Cookie: authCookie } });
     expect(res.status).toBe(200);
     const body = (await res.json()) as { content: string; kind: string; path: string };
@@ -69,14 +69,14 @@ describe('GET /api/claude-md (global)', () => {
     expect(body.content).toBe('');
   });
 
-  it('401 bez cookie', async () => {
+  it('401 without a cookie', async () => {
     const res = await fetch(`${server.baseUrl}/api/claude-md`);
     expect(res.status).toBe(401);
   });
 });
 
 describe('PUT /api/claude-md (global)', () => {
-  it('tworzy plik, zwraca mtime', async () => {
+  it('creates the file and returns mtime', async () => {
     const res = await fetch(`${server.baseUrl}/api/claude-md`, {
       method: 'PUT',
       headers: authHeaders(),
@@ -91,7 +91,7 @@ describe('PUT /api/claude-md (global)', () => {
     expect(onDisk).toContain('hello world');
   });
 
-  it('403 bez CSRF', async () => {
+  it('403 without CSRF', async () => {
     const res = await fetch(`${server.baseUrl}/api/claude-md`, {
       method: 'PUT',
       headers: { Cookie: authCookie, 'Content-Type': 'application/json' },
@@ -100,7 +100,7 @@ describe('PUT /api/claude-md (global)', () => {
     expect(res.status).toBe(403);
   });
 
-  it('413 przy body > 1 MB (Content-Length short-circuit)', async () => {
+  it('413 when body > 1 MB (Content-Length short-circuit)', async () => {
     const big = 'x'.repeat(1_100_000);
     const res = await fetch(`${server.baseUrl}/api/claude-md`, {
       method: 'PUT',
@@ -110,7 +110,7 @@ describe('PUT /api/claude-md (global)', () => {
     expect(res.status).toBe(413);
   });
 
-  it('412 conflict przy starym If-Unmodified-Since', async () => {
+  it('412 conflict when If-Unmodified-Since is stale', async () => {
     // First current write.
     const first = await fetch(`${server.baseUrl}/api/claude-md`, {
       method: 'PUT',
@@ -138,7 +138,7 @@ describe('PUT /api/claude-md (global)', () => {
 });
 
 describe('PUT /api/claude-md/[slug] (project)', () => {
-  it('tworzy plik pod <project-cwd>/CLAUDE.md', async () => {
+  it('creates the file under <project-cwd>/CLAUDE.md', async () => {
     const res = await fetch(`${server.baseUrl}/api/claude-md/${fake.slug}`, {
       method: 'PUT',
       headers: authHeaders(),
@@ -151,7 +151,7 @@ describe('PUT /api/claude-md/[slug] (project)', () => {
     expect(onDisk).toContain('Project CLAUDE.md');
   });
 
-  it('400 dla invalid slug', async () => {
+  it('400 for an invalid slug', async () => {
     const res = await fetch(`${server.baseUrl}/api/claude-md/..evil`, {
       method: 'PUT',
       headers: authHeaders(),
@@ -160,7 +160,7 @@ describe('PUT /api/claude-md/[slug] (project)', () => {
     expect(res.status).toBe(400);
   });
 
-  it('400 dla nieistniejącego projektu', async () => {
+  it('400 for a missing project', async () => {
     const res = await fetch(`${server.baseUrl}/api/claude-md/-tmp-nope`, {
       method: 'PUT',
       headers: authHeaders(),

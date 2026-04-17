@@ -57,20 +57,20 @@ beforeAll(async () => {
 });
 
 describe('listProjects (fake-home)', () => {
-  it('wykrywa 5 projektów z fixture', async () => {
+  it('discovers 5 fixture projects', async () => {
     const projects = await listProjects();
     expect(projects).toHaveLength(5);
     const slugs = projects.map((p) => p.slug).sort();
     expect(slugs).toEqual(['-tmp-alpha', '-tmp-beta', '-tmp-delta', '-tmp-epsilon', '-tmp-gamma']);
   });
 
-  it('sniffuje resolvedCwd z pierwszego eventu', async () => {
+  it('sniffs resolvedCwd from the first event', async () => {
     const projects = await listProjects();
     const alpha = projects.find((p) => p.slug === '-tmp-alpha');
     expect(alpha?.resolvedCwd).toBe('/tmp/alpha');
   });
 
-  it('zlicza sesje per projekt', async () => {
+  it('counts sessions per project', async () => {
     const projects = await listProjects();
     const epsilon = projects.find((p) => p.slug === '-tmp-epsilon');
     expect(epsilon?.sessionCount).toBe(3);
@@ -80,13 +80,13 @@ describe('listProjects (fake-home)', () => {
 });
 
 describe('listSessions', () => {
-  it('zwraca sesje dla valid slug, posortowane po mtime DESC', async () => {
+  it('returns sessions for a valid slug sorted by mtime DESC', async () => {
     const sessions = await listSessions('-tmp-epsilon');
     expect(sessions).toHaveLength(3);
     expect(sessions[0]?.id).toBe('44444444-0000-4000-8000-000000000003');
   });
 
-  it('rzuca na invalid slug', async () => {
+  it('throws on an invalid slug', async () => {
     await expect(listSessions('../../etc')).rejects.toThrow('invalid_slug');
     await expect(listSessions('')).rejects.toThrow('invalid_slug');
     await expect(listSessions('foo/bar')).rejects.toThrow('invalid_slug');
@@ -94,16 +94,16 @@ describe('listSessions', () => {
 });
 
 describe('resolveSessionPath', () => {
-  it('zwraca bezpieczną ścieżkę', async () => {
+  it('returns a safe, resolved path', async () => {
     const p = await resolveSessionPath('-tmp-alpha', '00000000-0000-4000-8000-000000000001');
     expect(p).toMatch(/\-tmp-alpha\/00000000-0000-4000-8000-000000000001\.jsonl$/);
   });
 
-  it('odrzuca path traversal w sessionId', async () => {
+  it('rejects path traversal in sessionId', async () => {
     await expect(resolveSessionPath('-tmp-alpha', '../../etc/passwd')).rejects.toThrow();
   });
 
-  it('odrzuca invalid slug', async () => {
+  it('rejects an invalid slug', async () => {
     await expect(
       resolveSessionPath('../alpha', '00000000-0000-4000-8000-000000000001'),
     ).rejects.toThrow();
@@ -111,10 +111,10 @@ describe('resolveSessionPath', () => {
 });
 
 describe('sessionPreview', () => {
-  it('liczy wiadomości (pomija malformed)', async () => {
+  it('counts messages (skipping malformed lines)', async () => {
     const path = await resolveSessionPath('-tmp-alpha', '00000000-0000-4000-8000-000000000001');
     const preview = await sessionPreview(path);
-    // Fixture ma 10 poprawnych linii + 1 malformed.
+    // Fixture has 10 well-formed lines plus 1 malformed.
     expect(preview.messageCount).toBe(10);
     expect(preview.firstUserPreview).toBe('Hello there');
   });
@@ -146,7 +146,7 @@ describe('inferCwdFromSlug (legacy fallback)', () => {
     await rm(otherDir, { recursive: true, force: true });
   });
 
-  it('(a) sniff hit wygrywa z fallbackiem', async () => {
+  it('(a) a sniff hit wins over the fallback', async () => {
     // Alpha has sniffed cwd '/tmp/alpha' which is NOT under FAKE_HOME. If the
     // fallback ran, it would return null and overwrite the sniff. Observing
     // the sniffed value proves sniff-hit takes precedence.
@@ -155,31 +155,31 @@ describe('inferCwdFromSlug (legacy fallback)', () => {
     expect(alpha?.resolvedCwd).toBe('/tmp/alpha');
   });
 
-  it('(b) sniff miss + prawdziwy katalog pod $HOME zwraca ten katalog', async () => {
+  it('(b) sniff miss + real directory under $HOME returns that directory', async () => {
     const slug = homeDir.replaceAll('/', '-') + '-projectdir';
     const result = await inferCwdFromSlug(slug, homeDir);
     expect(result).toBe(join(homeDir, 'projectdir'));
   });
 
-  it('(c) sniff miss + katalog poza $HOME zwraca null', async () => {
+  it('(c) sniff miss + directory outside $HOME returns null', async () => {
     const slug = otherDir.replaceAll('/', '-') + '-outside';
     const result = await inferCwdFromSlug(slug, homeDir);
     expect(result).toBeNull();
   });
 
-  it('odrzuca symlink wskazujący poza $HOME', async () => {
+  it('rejects a symlink pointing outside $HOME', async () => {
     const slug = homeDir.replaceAll('/', '-') + '-escape';
     const result = await inferCwdFromSlug(slug, homeDir);
     expect(result).toBeNull();
   });
 
-  it('odrzuca nieistniejącą ścieżkę', async () => {
+  it('rejects a missing path', async () => {
     const slug = homeDir.replaceAll('/', '-') + '-nope';
     const result = await inferCwdFromSlug(slug, homeDir);
     expect(result).toBeNull();
   });
 
-  it('odrzuca plik (nie katalog)', async () => {
+  it('rejects a regular file (not a directory)', async () => {
     const slug = homeDir.replaceAll('/', '-') + '-notadir';
     const result = await inferCwdFromSlug(slug, homeDir);
     expect(result).toBeNull();
@@ -191,7 +191,7 @@ describe('inferCwdFromSlug (legacy fallback)', () => {
     expect(result).toBeNull();
   });
 
-  it('odrzuca invalid slug', async () => {
+  it('rejects an invalid slug', async () => {
     expect(await inferCwdFromSlug('../etc', homeDir)).toBeNull();
     expect(await inferCwdFromSlug('foo/bar', homeDir)).toBeNull();
     expect(await inferCwdFromSlug('', homeDir)).toBeNull();

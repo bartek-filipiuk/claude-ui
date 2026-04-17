@@ -63,7 +63,7 @@ function collectEvents(ws: WebSocket, ms: number): Promise<Array<Record<string, 
 }
 
 describe('WS /api/ws/watch — upgrade security', () => {
-  it('403 bez Origin', async () => {
+  it('403 without Origin', async () => {
     const ws = new WebSocket(`ws://127.0.0.1:${server.port}/api/ws/watch`);
     await expect(
       new Promise((_, reject) => {
@@ -75,7 +75,7 @@ describe('WS /api/ws/watch — upgrade security', () => {
     ).rejects.toThrow(/403/);
   });
 
-  it('403 bez cookie', async () => {
+  it('403 without cookie', async () => {
     const ws = new WebSocket(`ws://127.0.0.1:${server.port}/api/ws/watch`, {
       headers: { Origin: `http://127.0.0.1:${server.port}` },
     });
@@ -91,7 +91,7 @@ describe('WS /api/ws/watch — upgrade security', () => {
 });
 
 describe('WS /api/ws/watch — events', () => {
-  it('session-added po dopisaniu pliku .jsonl', async () => {
+  it('emits session-added after a .jsonl file appears', async () => {
     const ws = await openWatch({ Cookie: authCookie });
     // Give the watcher a moment to boot.
     await new Promise((r) => setTimeout(r, 200));
@@ -118,7 +118,7 @@ describe('WS /api/ws/watch — events', () => {
     ws.close();
   }, 15_000);
 
-  it('session-updated po append do istniejącego pliku (debounced)', async () => {
+  it('emits session-updated after appends to an existing file (debounced)', async () => {
     const slug = '-tmp-watch-beta';
     const dir = `${home}/.claude/projects/${slug}`;
     mkdirSync(dir, { recursive: true });
@@ -162,7 +162,7 @@ describe('WS /api/ws/watch — events', () => {
     ws.close();
   }, 15_000);
 
-  it('nie emituje eventów spoza projects dir (symlink-escape bezpieczeństwo)', async () => {
+  it('never emits events outside the projects dir (symlink-escape safety)', async () => {
     const ws = await openWatch({ Cookie: authCookie });
     await new Promise((r) => setTimeout(r, 200));
 

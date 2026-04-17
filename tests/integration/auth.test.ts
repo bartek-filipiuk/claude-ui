@@ -40,7 +40,7 @@ afterAll(async () => {
 });
 
 describe('GET /api/auth', () => {
-  it('200 HTML + ustawia cookie dla poprawnego tokena', async () => {
+  it('200 HTML + sets cookie on a valid token', async () => {
     const res = await fetch(`${server.baseUrl}/api/auth?k=${server.token}`, {
       redirect: 'manual',
     });
@@ -62,19 +62,19 @@ describe('GET /api/auth', () => {
     expect(csrf).not.toMatch(/HttpOnly/i);
   });
 
-  it('401 dla złego tokena', async () => {
+  it('401 on a bad token', async () => {
     const res = await fetch(`${server.baseUrl}/api/auth?k=deadbeef`, { redirect: 'manual' });
     expect(res.status).toBe(401);
   });
 
-  it('401 dla pustego tokena', async () => {
+  it('401 on an empty token', async () => {
     const res = await fetch(`${server.baseUrl}/api/auth`, { redirect: 'manual' });
     expect(res.status).toBe(401);
   });
 });
 
 describe('Host allowlist', () => {
-  it('403 dla Host: evil.com', async () => {
+  it('403 on Host: evil.com', async () => {
     // Node's undici fetch disallows overriding Host header for security reasons,
     // so use raw http.request which honours the Host we set.
     const res = await rawRequest('127.0.0.1', server.port, '/api/healthz', {
@@ -83,29 +83,29 @@ describe('Host allowlist', () => {
     expect(res.statusCode).toBe(403);
   });
 
-  it('OK dla Host: 127.0.0.1:PORT', async () => {
+  it('OK on Host: 127.0.0.1:PORT', async () => {
     const res = await fetch(`${server.baseUrl}/api/healthz`);
     expect(res.status).toBe(200);
   });
 
-  it('OK dla Host: localhost:PORT', async () => {
+  it('OK on Host: localhost:PORT', async () => {
     const res = await fetch(`http://localhost:${server.port}/api/healthz`);
     expect(res.status).toBe(200);
   });
 });
 
 describe('Auth-gated endpoints', () => {
-  it('401 bez cookie na nieznanym endpoincie (np. /)', async () => {
+  it('401 without cookie on an unknown endpoint (e.g. /)', async () => {
     const res = await fetch(`${server.baseUrl}/`);
-    // Either 401 (jeśli strona / jest auth-gated) lub 200 zależy od tego czy / jest exempt.
-    // Dla naszego setup / nie jest exempt — musi być 401.
+    // Either 401 (if / is auth-gated) or 200 depending on exemption rules.
+    // In our setup / is not exempt — must be 401.
     expect(res.status).toBe(401);
   });
 });
 
 describe('CSRF on unsafe methods', () => {
-  it('403 dla POST bez CSRF, z auth cookie', async () => {
-    // Najpierw zdobądź auth cookie.
+  it('403 on POST without CSRF, even with an auth cookie', async () => {
+    // First obtain an auth cookie.
     const authRes = await fetch(`${server.baseUrl}/api/auth?k=${server.token}`, {
       redirect: 'manual',
     });
@@ -120,7 +120,7 @@ describe('CSRF on unsafe methods', () => {
       headers: { Cookie: cookies },
       body: '{}',
     });
-    // Middleware odrzuca na CSRF przed Next 404 handlerem.
+    // Middleware rejects on CSRF before the Next 404 handler kicks in.
     expect(res.status).toBe(403);
   });
 });

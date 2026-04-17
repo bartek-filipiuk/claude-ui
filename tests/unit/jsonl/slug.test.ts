@@ -2,31 +2,31 @@ import { describe, it, expect } from 'vitest';
 import { decodeSlugToDisplayPath, isValidSlug } from '@/lib/jsonl/slug';
 
 describe('isValidSlug', () => {
-  it('akceptuje typowe slug', () => {
+  it('accepts typical slugs', () => {
     expect(isValidSlug('-home-bartek-main-projects-foo')).toBe(true);
     expect(isValidSlug('-a0-usr-workdir')).toBe(true);
     expect(isValidSlug('foo')).toBe(true);
   });
 
-  it('odrzuca slash', () => {
+  it('rejects slashes', () => {
     expect(isValidSlug('home/bartek')).toBe(false);
   });
 
-  it('odrzuca dot-dot', () => {
+  it('rejects dot-dot components', () => {
     expect(isValidSlug('..')).toBe(false);
     expect(isValidSlug('foo/../bar')).toBe(false);
     expect(isValidSlug('-home-..-etc')).toBe(false);
   });
 
-  it('odrzuca null byte', () => {
+  it('rejects null bytes', () => {
     expect(isValidSlug('foo\0')).toBe(false);
   });
 
-  it('odrzuca pusty', () => {
+  it('rejects an empty string', () => {
     expect(isValidSlug('')).toBe(false);
   });
 
-  it('odrzuca znaki specjalne', () => {
+  it('rejects special characters', () => {
     expect(isValidSlug('foo bar')).toBe(false);
     expect(isValidSlug('foo&bar')).toBe(false);
     expect(isValidSlug('<script>')).toBe(false);
@@ -34,19 +34,19 @@ describe('isValidSlug', () => {
 });
 
 describe('decodeSlugToDisplayPath', () => {
-  it('dekoduje slug zaczynający się od -', () => {
+  it('decodes a slug that starts with a dash', () => {
     expect(decodeSlugToDisplayPath('-home-bartek-foo')).toBe('/home/bartek/foo');
   });
 
-  it('dekoduje slug bez leading -', () => {
+  it('decodes a slug without a leading dash', () => {
     expect(decodeSlugToDisplayPath('a-b-c')).toBe('a/b/c');
   });
 
-  it('zwraca wejście dla invalid slug', () => {
+  it('returns the input for an invalid slug', () => {
     expect(decodeSlugToDisplayPath('foo/bar')).toBe('foo/bar');
   });
 
-  it('round-trip dla typowych ścieżek', () => {
+  it('round-trips for typical paths', () => {
     const cases = [
       ['-home-bartek-foo', '/home/bartek/foo'],
       ['-tmp', '/tmp'],
