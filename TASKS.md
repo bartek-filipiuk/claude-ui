@@ -163,7 +163,7 @@ next `[ ]`. Never reorder or delete tasks — only check them off.
 
 ### T12 — Toast notifications (shadcn Sonner)
 
-- [ ] **Goal:** replace silent "Saved" badges / inline error bars with
+- [x] **Goal:** replace silent "Saved" badges / inline error bars with
   a single toast system. Triggers: CLAUDE.md saved / conflict, alias
   updated, WS reconnect, tab kill.
 - **Touch:** `pnpm add sonner`, mount `<Toaster />` in `Providers`,
