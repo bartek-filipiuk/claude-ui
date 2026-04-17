@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { isClaudeMdPath } from '@/lib/claude-md/write-guard';
 
 describe('isClaudeMdPath — fuzz', () => {
-  it('akceptuje prostą nazwę CLAUDE.md', () => {
+  it('accepts a plain CLAUDE.md name', () => {
     expect(isClaudeMdPath('/tmp/proj/CLAUDE.md')).toBe(true);
     expect(isClaudeMdPath('CLAUDE.md')).toBe(true);
   });
@@ -19,7 +19,7 @@ describe('isClaudeMdPath — fuzz', () => {
     'foo/CLAUDE.md.tmp',
     'CLAUDE.MD',
   ];
-  it.each(rejected)('odrzuca %s', (p) => {
+  it.each(rejected)('rejects %s', (p) => {
     expect(isClaudeMdPath(p)).toBe(false);
   });
 

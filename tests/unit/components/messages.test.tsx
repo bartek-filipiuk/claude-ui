@@ -21,7 +21,7 @@ function make<T extends JsonlEvent['type']>(ev: Extract<JsonlEvent, { type: T }>
 }
 
 describe('renderEvent', () => {
-  it('renderuje user jako pre z treścią', () => {
+  it('renders a user event as a pre with its content', () => {
     const ev = make({
       type: 'user',
       message: { role: 'user', content: 'Hello' },
@@ -31,7 +31,7 @@ describe('renderEvent', () => {
     expect(screen.getByText('user')).toBeDefined();
   });
 
-  it('renderuje assistant (markdown)', () => {
+  it('renders assistant (markdown)', () => {
     const ev = make({
       type: 'assistant',
       message: { role: 'assistant', content: [{ type: 'text', text: 'hello world' }] as never },
@@ -40,7 +40,7 @@ describe('renderEvent', () => {
     expect(screen.getByText('hello world')).toBeDefined();
   });
 
-  it('assistant XSS <script> pozostaje tekstem (rehype-sanitize)', () => {
+  it('assistant XSS <script> stays as text (rehype-sanitize)', () => {
     const payload = 'safe then <script>alert(1)</script> end';
     const ev = make({
       type: 'assistant',
@@ -51,7 +51,7 @@ describe('renderEvent', () => {
     expect(container.querySelector('script')).toBeNull();
   });
 
-  it('tool_use zwija input domyślnie, nazwa widoczna', () => {
+  it('tool_use collapses input by default, name stays visible', () => {
     const ev = make({
       type: 'tool_use',
       name: 'Bash',
@@ -61,7 +61,7 @@ describe('renderEvent', () => {
     expect(screen.getByText('Bash')).toBeDefined();
   });
 
-  it('tool_result pokazuje exit', () => {
+  it('tool_result shows the exit code', () => {
     const ev = make({
       type: 'tool_result',
       toolUseResult: { stdout: 'ok', stderr: '', exitCode: 0 },
@@ -70,13 +70,13 @@ describe('renderEvent', () => {
     expect(screen.getByText(/exit 0/)).toBeDefined();
   });
 
-  it('system pokazuje slug', () => {
+  it('system shows the slug', () => {
     const ev = make({ type: 'system', slug: 'hook-fired' });
     renderEv(renderEvent(ev, 0));
     expect(screen.getByText('hook-fired')).toBeDefined();
   });
 
-  it('attachment pokazuje hookName i exit', () => {
+  it('attachment shows hook name and exit code', () => {
     const ev = make({
       type: 'attachment',
       hookName: 'PostToolUse',
@@ -87,19 +87,19 @@ describe('renderEvent', () => {
     expect(screen.getByText('PostToolUse')).toBeDefined();
   });
 
-  it('permission-mode pokazuje mode', () => {
+  it('permission-mode shows the mode', () => {
     const ev = make({ type: 'permission-mode', mode: 'plan' });
     renderEv(renderEvent(ev, 0));
     expect(screen.getByText('plan')).toBeDefined();
   });
 
-  it('queue-operation pokazuje operation', () => {
+  it('queue-operation shows the operation', () => {
     const ev = make({ type: 'queue-operation', operation: 'enqueue' });
     renderEv(renderEvent(ev, 0));
     expect(screen.getByText('enqueue')).toBeDefined();
   });
 
-  it('file-history-snapshot renderuje placeholder', () => {
+  it('file-history-snapshot renders a placeholder', () => {
     const ev = make({ type: 'file-history-snapshot' });
     renderEv(renderEvent(ev, 0));
     expect(screen.getByText(/file history/)).toBeDefined();

@@ -12,26 +12,26 @@ beforeEach(() => {
 });
 
 describe('layout-storage editorPreview', () => {
-  it('domyślnie editorPreview jest undefined', () => {
+  it('editorPreview defaults to undefined', () => {
     expect(loadLayout().editorPreview).toBeUndefined();
   });
 
-  it('patchLayout zapisuje editorPreview=true i loadLayout je czyta', () => {
+  it('patchLayout persists editorPreview=true and loadLayout reads it back', () => {
     patchLayout({ editorPreview: true });
     expect(loadLayout().editorPreview).toBe(true);
   });
 
-  it('patchLayout zapisuje editorPreview=false', () => {
+  it('patchLayout persists editorPreview=false', () => {
     patchLayout({ editorPreview: false });
     expect(loadLayout().editorPreview).toBe(false);
   });
 
-  it('ignoruje nielogiczną wartość', () => {
+  it('ignores nonsensical values', () => {
     window.localStorage.setItem(LAYOUT_STORAGE_KEY, JSON.stringify({ editorPreview: 'yes' }));
     expect(loadLayout().editorPreview).toBeUndefined();
   });
 
-  it('zachowuje inne pola przy patchu editorPreview', () => {
+  it('preserves other fields when patching editorPreview', () => {
     patchLayout({ sidebar: 250, editorPreview: true });
     const loaded = loadLayout();
     expect(loaded.sidebar).toBe(250);

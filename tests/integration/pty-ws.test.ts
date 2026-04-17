@@ -68,7 +68,7 @@ async function waitMessage(
 }
 
 describe('WS /api/ws/pty — upgrade security', () => {
-  it('403 bez Origin', async () => {
+  it('403 without Origin', async () => {
     const ws = new WebSocket(`ws://127.0.0.1:${server.port}/api/ws/pty`);
     await expect(
       new Promise((_, reject) => {
@@ -80,7 +80,7 @@ describe('WS /api/ws/pty — upgrade security', () => {
     ).rejects.toThrow(/403/);
   });
 
-  it('403 dla złego Origin', async () => {
+  it('403 for a bad Origin', async () => {
     const ws = new WebSocket(`ws://127.0.0.1:${server.port}/api/ws/pty`, {
       headers: { Origin: 'http://evil.com' },
     });
@@ -94,7 +94,7 @@ describe('WS /api/ws/pty — upgrade security', () => {
     ).rejects.toThrow(/403/);
   });
 
-  it('403 bez cookie (poprawny Origin, brak auth)', async () => {
+  it('403 without cookie (valid Origin, missing auth)', async () => {
     const ws = new WebSocket(`ws://127.0.0.1:${server.port}/api/ws/pty`, {
       headers: { Origin: `http://127.0.0.1:${server.port}` },
     });
@@ -147,7 +147,7 @@ describe('WS /api/ws/pty — spawn + data + kill', () => {
     ws.close();
   }, 30_000);
 
-  it('odrzuca spawn bez CSRF', async () => {
+  it('rejects spawn without CSRF', async () => {
     const ws = await openWs({ Cookie: authCookie });
     ws.send(
       JSON.stringify({
@@ -162,7 +162,7 @@ describe('WS /api/ws/pty — spawn + data + kill', () => {
     expect(err['code']).toBe('csrf');
   }, 10_000);
 
-  it('odrzuca cwd poza $HOME', async () => {
+  it('rejects cwd outside $HOME', async () => {
     const ws = await openWs({ Cookie: authCookie });
     ws.send(
       JSON.stringify({

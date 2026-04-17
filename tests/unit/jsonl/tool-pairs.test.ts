@@ -3,7 +3,7 @@ import { buildToolUseRegistry, extractDiffFromInput } from '@/lib/jsonl/tool-pai
 import type { JsonlEvent } from '@/lib/jsonl/types';
 
 describe('extractDiffFromInput', () => {
-  it('zwraca stary/nowy string dla Edit', () => {
+  it('returns old/new strings for Edit', () => {
     const d = extractDiffFromInput('Edit', {
       file_path: '/tmp/a.ts',
       old_string: 'foo',
@@ -16,7 +16,7 @@ describe('extractDiffFromInput', () => {
     expect(d?.newText).toBe('bar');
   });
 
-  it('Write: oldText puste, newText to content', () => {
+  it('Write: oldText is empty, newText is the content', () => {
     const d = extractDiffFromInput('Write', {
       file_path: '/tmp/b.md',
       content: 'hello',
@@ -26,7 +26,7 @@ describe('extractDiffFromInput', () => {
     expect(d?.newText).toBe('hello');
   });
 
-  it('NotebookEdit używa old_source/new_source', () => {
+  it('NotebookEdit reads old_source / new_source', () => {
     const d = extractDiffFromInput('NotebookEdit', {
       notebook_path: '/n.ipynb',
       old_source: 'print(1)',
@@ -38,23 +38,23 @@ describe('extractDiffFromInput', () => {
     expect(d?.newText).toBe('print(2)');
   });
 
-  it('zwraca null dla nieobsługiwanego narzędzia', () => {
+  it('returns null for an unsupported tool', () => {
     expect(extractDiffFromInput('Bash', { command: 'ls' })).toBeNull();
     expect(extractDiffFromInput('Read', { file_path: '/x' })).toBeNull();
   });
 
-  it('zwraca null gdy Edit nie ma ani starego ani nowego', () => {
+  it('returns null when Edit has neither old nor new string', () => {
     expect(extractDiffFromInput('Edit', { file_path: '/x' })).toBeNull();
   });
 
-  it('zwraca null dla niepoprawnego input', () => {
+  it('returns null for invalid input', () => {
     expect(extractDiffFromInput('Edit', null)).toBeNull();
     expect(extractDiffFromInput('Edit', 'nope')).toBeNull();
   });
 });
 
 describe('buildToolUseRegistry', () => {
-  it('zbiera tool_use Edit po id z assistant.message.content', () => {
+  it('collects Edit tool_use entries keyed by id from assistant content', () => {
     const events: JsonlEvent[] = [
       {
         type: 'assistant',
@@ -79,7 +79,7 @@ describe('buildToolUseRegistry', () => {
     expect(entry?.newText).toBe('b');
   });
 
-  it('pomija tool_use dla narzędzi bez diff (np. Bash)', () => {
+  it('skips tool_use for tools without a diff (e.g. Bash)', () => {
     const events: JsonlEvent[] = [
       {
         type: 'assistant',
@@ -100,7 +100,7 @@ describe('buildToolUseRegistry', () => {
     expect(reg.size).toBe(0);
   });
 
-  it('obsługuje mieszane bloki i wiele zdarzeń', () => {
+  it('handles mixed blocks across multiple events', () => {
     const events: JsonlEvent[] = [
       {
         type: 'assistant',
@@ -138,7 +138,7 @@ describe('buildToolUseRegistry', () => {
     expect(reg.get('toolu_edit')?.name).toBe('Edit');
   });
 
-  it('ignoruje tool_use bez id', () => {
+  it('ignores tool_use without an id', () => {
     const events: JsonlEvent[] = [
       {
         type: 'assistant',

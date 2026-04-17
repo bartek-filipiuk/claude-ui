@@ -8,7 +8,7 @@ import { DiffView } from '@/components/conversation/DiffView';
 afterEach(() => cleanup());
 
 describe('DiffView', () => {
-  it('renderuje dodane linie jako zielone i usunięte jako czerwone', () => {
+  it('renders added lines green and removed lines red', () => {
     const { container } = render(
       <DiffView
         oldText={'alpha\nbeta\n'}
@@ -23,7 +23,7 @@ describe('DiffView', () => {
     expect(screen.getByText('/x.ts')).toBeDefined();
   });
 
-  it('pokazuje licznik + / -', () => {
+  it('shows the +/- counters', () => {
     const { container } = render(<DiffView oldText={'a\nb\n'} newText={'a\nc\n'} label="Edit" />);
     expect(container.textContent).toMatch(/\+1/);
     expect(container.textContent).toMatch(/-1/);
@@ -52,7 +52,7 @@ describe('ToolResultBlock → DiffView pairing', () => {
     } as unknown as JsonlEvent;
   }
 
-  it('renderuje diff dla tool_result sparowanego z Edit', () => {
+  it('renders a diff for a tool_result paired with an Edit', () => {
     const events: JsonlEvent[] = [
       toolUseAssistant('toolu_1', 'Edit', {
         file_path: '/a.ts',
@@ -66,7 +66,7 @@ describe('ToolResultBlock → DiffView pairing', () => {
     expect(container.querySelector('[data-testid="diff-view"]')).not.toBeNull();
   });
 
-  it('fallback do raw output gdy brak pary', () => {
+  it('falls back to raw output when no pair exists', () => {
     const events: JsonlEvent[] = [toolResultUser('toolu_unknown', 'stdout text here')];
     const registry = buildToolUseRegistry(events);
     const { container } = render(<>{renderEvent(events[0]!, 0, registry)}</>);
@@ -75,7 +75,7 @@ describe('ToolResultBlock → DiffView pairing', () => {
     expect(container.textContent).toMatch(/stdout text here/);
   });
 
-  it('fallback do raw output gdy tool_result jest błędem', () => {
+  it('falls back to raw output when the tool_result is an error', () => {
     const events: JsonlEvent[] = [
       toolUseAssistant('toolu_err', 'Edit', {
         file_path: '/a',
@@ -89,7 +89,7 @@ describe('ToolResultBlock → DiffView pairing', () => {
     expect(container.querySelector('[data-testid="diff-view"]')).toBeNull();
   });
 
-  it('nie psuje renderowania nie-diff tooli', () => {
+  it('does not disturb rendering for non-diff tools', () => {
     const events: JsonlEvent[] = [
       toolUseAssistant('toolu_bash', 'Bash', { command: 'ls' }),
       toolResultUser('toolu_bash', 'file1\nfile2'),

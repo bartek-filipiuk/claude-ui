@@ -59,21 +59,21 @@ afterEach(() => {
 });
 
 describe('<ProjectList />', () => {
-  it('renderuje 3 projekty', async () => {
+  it('renders 3 projects', async () => {
     render(<ProjectList />, { wrapper });
     expect(await screen.findByText('/home/bartek/alpha')).toBeDefined();
     expect(screen.getByText('/home/bartek/beta')).toBeDefined();
   });
 
-  it('renderuje nazwę z <script> jako tekst (XSS safe)', async () => {
+  it('renders a <script> name as plain text (XSS safe)', async () => {
     render(<ProjectList />, { wrapper });
     const xssText = await screen.findByText('<script>alert(1)</script>');
     expect(xssText).toBeDefined();
-    // Nie powinno być <script> w DOM-ie z wynikiem parsowania.
+    // No parsed <script> element should survive into the DOM.
     expect(document.querySelector('script[data-xss]')).toBeNull();
   });
 
-  it('filtruje po substring', async () => {
+  it('filters by substring', async () => {
     render(<ProjectList />, { wrapper });
     await screen.findByText('/home/bartek/alpha');
     act(() => {

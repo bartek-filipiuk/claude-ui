@@ -90,13 +90,13 @@ test.beforeEach(async ({ page }) => {
   expect(res.status()).toBe(200);
 });
 
-test('otwieram sesję → widzę wiadomości', async ({ page }) => {
+test('opening a session shows its messages', async ({ page }) => {
   await page.goto(`http://127.0.0.1:${port}/`);
   await page.getByText('/tmp/alpha').click();
   // First session tile, click it.
   await page
     .getByRole('button')
-    .filter({ hasText: /wiadomości/ })
+    .filter({ hasText: /messages/ })
     .first()
     .click();
   // Expected: user "Hello there" from fixture.
@@ -107,7 +107,7 @@ test('otwieram sesję → widzę wiadomości', async ({ page }) => {
   await expect(page.getByText('Bash')).toBeVisible();
 });
 
-test('XSS w assistant content nie odpala alert', async ({ page }) => {
+test('XSS in assistant content does not fire an alert', async ({ page }) => {
   const alerts: string[] = [];
   page.on('dialog', async (d) => {
     alerts.push(d.message());
@@ -117,7 +117,7 @@ test('XSS w assistant content nie odpala alert', async ({ page }) => {
   await page.getByText('/tmp/gamma').click();
   await page
     .getByRole('button')
-    .filter({ hasText: /wiadomości/ })
+    .filter({ hasText: /messages/ })
     .first()
     .click();
   // The raw markdown contains <script>alert(1)</script> inside backticks.
@@ -125,15 +125,15 @@ test('XSS w assistant content nie odpala alert', async ({ page }) => {
   expect(alerts).toHaveLength(0);
 });
 
-test('search w sesji podświetla i nawiguje', async ({ page }) => {
+test('in-session search highlights and navigates', async ({ page }) => {
   await page.goto(`http://127.0.0.1:${port}/`);
   await page.getByText('/tmp/alpha').click();
   await page
     .getByRole('button')
-    .filter({ hasText: /wiadomości/ })
+    .filter({ hasText: /messages/ })
     .first()
     .click();
-  const searchBox = page.getByLabel('Szukaj w sesji');
+  const searchBox = page.getByLabel('Search in session');
   await searchBox.fill('Hello');
   // counter shows "1/N".
   await expect(page.getByText(/^1\//)).toBeVisible();

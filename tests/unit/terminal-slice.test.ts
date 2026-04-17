@@ -6,7 +6,7 @@ beforeEach(() => {
 });
 
 describe('terminal-slice', () => {
-  it('openTab dodaje tab i ustawia active', () => {
+  it('openTab appends a tab and sets it active', () => {
     const id = useTerminalStore.getState().openTab({ cwd: '/tmp/a', title: 'a' });
     expect(id).not.toBeNull();
     const s = useTerminalStore.getState();
@@ -14,7 +14,7 @@ describe('terminal-slice', () => {
     expect(s.activeTabId).toBe(id);
   });
 
-  it('max 16 zakładek — 17ty zwraca null', () => {
+  it('caps at 16 tabs — the 17th returns null', () => {
     const s = useTerminalStore.getState();
     for (let i = 0; i < TERMINAL_TAB_CAP; i++) {
       s.openTab({ cwd: `/tmp/${i}`, title: `t${i}` });
@@ -25,7 +25,7 @@ describe('terminal-slice', () => {
     expect(useTerminalStore.getState().tabs).toHaveLength(TERMINAL_TAB_CAP);
   });
 
-  it('closeTab ustawia active na sąsiada', () => {
+  it('closeTab sets active to a neighbouring tab', () => {
     const s = useTerminalStore.getState();
     const a = s.openTab({ cwd: '/a', title: 'a' })!;
     const b = s.openTab({ cwd: '/b', title: 'b' })!;
@@ -37,7 +37,7 @@ describe('terminal-slice', () => {
     expect(next.activeTabId).toBe(c);
   });
 
-  it('closeTab ostatniej → activeTabId null', () => {
+  it('closeTab on the last tab clears activeTabId', () => {
     const s = useTerminalStore.getState();
     const a = s.openTab({ cwd: '/a', title: 'a' })!;
     useTerminalStore.getState().closeTab(a);
@@ -45,7 +45,7 @@ describe('terminal-slice', () => {
     expect(useTerminalStore.getState().tabs).toHaveLength(0);
   });
 
-  it('setActive ignoruje nieznane id', () => {
+  it('setActive ignores unknown ids', () => {
     const s = useTerminalStore.getState();
     const a = s.openTab({ cwd: '/a', title: 'a' })!;
     useTerminalStore.getState().setActive('nope');

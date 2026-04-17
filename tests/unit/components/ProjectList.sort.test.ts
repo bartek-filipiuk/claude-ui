@@ -21,19 +21,19 @@ const projects: ProjectSummary[] = [
 ];
 
 describe('filterAndSortProjects', () => {
-  it('sortuje po lastActivity malejąco bez ulubionych', () => {
+  it('sorts by lastActivity descending when no favorites are pinned', () => {
     const meta: ProjectMetaMap = {};
     const sorted = filterAndSortProjects(projects, meta, '');
     expect(sorted.map((p) => p.slug)).toEqual(['beta', 'alpha', 'gamma']);
   });
 
-  it('przypięte projekty trafiają na górę', () => {
+  it('pinned projects surface at the top', () => {
     const meta: ProjectMetaMap = { gamma: { favorite: true } };
     const sorted = filterAndSortProjects(projects, meta, '');
     expect(sorted.map((p) => p.slug)).toEqual(['gamma', 'beta', 'alpha']);
   });
 
-  it('wiele przypięć — sortowane po lastActivity wewnątrz grupy', () => {
+  it('multiple pins — each group still sorted by lastActivity', () => {
     const meta: ProjectMetaMap = {
       alpha: { favorite: true },
       gamma: { favorite: true },
@@ -42,20 +42,20 @@ describe('filterAndSortProjects', () => {
     expect(sorted.map((p) => p.slug)).toEqual(['alpha', 'gamma', 'beta']);
   });
 
-  it('filtr po substring zostawia piny i kolejność', () => {
+  it('substring filter keeps pins and ordering intact', () => {
     const meta: ProjectMetaMap = { gamma: { favorite: true } };
     const sorted = filterAndSortProjects(projects, meta, 'a');
     // gamma, alpha, beta all contain "a"
     expect(sorted.map((p) => p.slug)).toEqual(['gamma', 'beta', 'alpha']);
   });
 
-  it('filtr po aliasie', () => {
-    const meta: ProjectMetaMap = { beta: { alias: 'Moja super appka' } };
+  it('filters by alias', () => {
+    const meta: ProjectMetaMap = { beta: { alias: 'My super app' } };
     const sorted = filterAndSortProjects(projects, meta, 'super');
     expect(sorted.map((p) => p.slug)).toEqual(['beta']);
   });
 
-  it("tryb 'name' sortuje alfabetycznie po aliasie albo ścieżce", () => {
+  it("mode 'name' sorts alphabetically by alias or path", () => {
     const meta: ProjectMetaMap = {
       alpha: { alias: 'Charlie' },
       beta: { alias: 'Alpha project' },
@@ -65,7 +65,7 @@ describe('filterAndSortProjects', () => {
     expect(sorted.map((p) => p.slug)).toEqual(['beta', 'gamma', 'alpha']);
   });
 
-  it("tryb 'sessions' sortuje po liczbie sesji malejąco, dogrywka po aktywności", () => {
+  it("mode 'sessions' sorts by session count desc, breaking ties by activity", () => {
     const list: ProjectSummary[] = [
       makeProject('alpha', '2026-04-16T10:00:00.000Z', 2),
       makeProject('beta', '2026-04-16T12:00:00.000Z', 5),
@@ -75,7 +75,7 @@ describe('filterAndSortProjects', () => {
     expect(sorted.map((p) => p.slug)).toEqual(['beta', 'gamma', 'alpha']);
   });
 
-  it("tryb 'name' nadal respektuje przypięcia na górze", () => {
+  it("mode 'name' still pins favorites to the top", () => {
     const meta: ProjectMetaMap = { gamma: { favorite: true } };
     const sorted = filterAndSortProjects(projects, meta, '', 'name');
     expect(sorted[0]?.slug).toBe('gamma');

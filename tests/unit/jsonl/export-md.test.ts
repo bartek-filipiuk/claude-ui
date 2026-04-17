@@ -17,12 +17,12 @@ const sample: JsonlEvent[] = [
 ];
 
 describe('sessionToMarkdown', () => {
-  it('zawiera heading z sessionId', () => {
+  it('includes a heading with the sessionId', () => {
     const md = sessionToMarkdown(sample, { sessionId: 'abc-123' });
     expect(md).toContain('# Claude Code session — abc-123');
   });
 
-  it('renderuje wszystkie typy (user/assistant/tool_use/tool_result/system)', () => {
+  it('renders every type (user/assistant/tool_use/tool_result/system)', () => {
     const md = sessionToMarkdown(sample, { sessionId: 'x' });
     expect(md).toContain('## User');
     expect(md).toContain('Hello, Claude');
@@ -35,7 +35,7 @@ describe('sessionToMarkdown', () => {
     expect(md).toContain('system');
   });
 
-  it('pomija noisy meta (queue-operation)', () => {
+  it('skips noisy meta events (queue-operation)', () => {
     const events: JsonlEvent[] = [
       { type: 'queue-operation', operation: 'enqueue' } as JsonlEvent,
       { type: 'user', message: { role: 'user', content: 'real' } } as JsonlEvent,
@@ -45,7 +45,7 @@ describe('sessionToMarkdown', () => {
     expect(md).not.toContain('queue-operation');
   });
 
-  it('obsługuje pustą sesję', () => {
+  it('handles an empty session', () => {
     const md = sessionToMarkdown([], { sessionId: 'empty' });
     expect(md).toContain('# Claude Code session — empty');
   });

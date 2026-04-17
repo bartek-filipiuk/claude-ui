@@ -3,8 +3,9 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
 const ROOT = resolve(__dirname, '../../..');
-const TARGETS = ['app', 'components'] as const;
+const TARGETS = ['app', 'components', 'lib', 'hooks', 'stores', 'tests'] as const;
 const POLISH = /[ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]/;
+const SELF = resolve(__dirname, 'no-polish-in-ui.test.ts');
 
 function walk(dir: string): string[] {
   const out: string[] = [];
@@ -21,12 +22,13 @@ function walk(dir: string): string[] {
   return out;
 }
 
-describe('i18n guard: no Polish diacritics in user-facing UI code', () => {
+describe('i18n guard: no Polish diacritics anywhere in the source tree', () => {
   for (const target of TARGETS) {
     it(`${target}/ stays free of Polish-specific characters`, () => {
       const files = walk(join(ROOT, target));
       const hits: string[] = [];
       for (const file of files) {
+        if (file === SELF) continue;
         const text = readFileSync(file, 'utf8');
         if (POLISH.test(text)) {
           hits.push(file.slice(ROOT.length + 1));

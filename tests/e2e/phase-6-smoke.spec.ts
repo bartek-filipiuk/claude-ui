@@ -116,7 +116,7 @@ test.beforeEach(async ({ page }) => {
   expect(res.status()).toBe(200);
 });
 
-test('nowa sesja w tle → sidebar auto-refresh', async ({ page }) => {
+test('new session in the background triggers sidebar auto-refresh', async ({ page }) => {
   await page.goto(`http://127.0.0.1:${port}/`);
   await expect(page.locator('aside button').filter({ hasText: /alpha/ }).first()).toBeVisible({
     timeout: 15_000,
@@ -124,7 +124,7 @@ test('nowa sesja w tle → sidebar auto-refresh', async ({ page }) => {
 
   await page.locator('aside button').filter({ hasText: /alpha/ }).first().click();
   // 1 session visible initially.
-  await expect(page.locator('button').filter({ hasText: /wiadomości/ })).toHaveCount(1);
+  await expect(page.locator('button').filter({ hasText: /messages/ })).toHaveCount(1);
 
   // Background: write a second session JSONL.
   const newSessionId = '11111111-0000-4000-8000-bbbbbbbbbbbb';
@@ -140,12 +140,12 @@ test('nowa sesja w tle → sidebar auto-refresh', async ({ page }) => {
     }) + '\n',
   );
 
-  await expect(page.locator('button').filter({ hasText: /wiadomości/ })).toHaveCount(2, {
+  await expect(page.locator('button').filter({ hasText: /messages/ })).toHaveCount(2, {
     timeout: 5_000,
   });
 });
 
-test('append do otwartej sesji → zmiany widoczne', async ({ page }) => {
+test('append to an open session surfaces the changes', async ({ page }) => {
   await page.goto(`http://127.0.0.1:${port}/`);
   await expect(page.locator('aside button').filter({ hasText: /alpha/ }).first()).toBeVisible({
     timeout: 15_000,
@@ -170,7 +170,7 @@ test('append do otwartej sesji → zmiany widoczne', async ({ page }) => {
   await expect(
     page
       .locator('button')
-      .filter({ hasText: /wiadomości/ })
+      .filter({ hasText: /messages/ })
       .first(),
   ).toBeVisible();
 });

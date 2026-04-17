@@ -7,7 +7,7 @@ function streamOf(s: string): Readable {
 }
 
 describe('parseJsonlStream', () => {
-  it('parsuje kilka poprawnych linii', async () => {
+  it('parses a handful of well-formed lines', async () => {
     const input = [
       JSON.stringify({ type: 'user', message: { role: 'user', content: 'a' } }),
       JSON.stringify({ type: 'assistant', message: { role: 'assistant', content: [] } }),
@@ -21,7 +21,7 @@ describe('parseJsonlStream', () => {
     expect(out[1]?.type).toBe('assistant');
   });
 
-  it('pomija malformed JSON', async () => {
+  it('skips malformed JSON', async () => {
     const input = [
       JSON.stringify({ type: 'user', message: { role: 'user', content: 'a' } }),
       'not json',
@@ -34,7 +34,7 @@ describe('parseJsonlStream', () => {
     expect(out).toHaveLength(2);
   });
 
-  it('pomija schema violations', async () => {
+  it('skips schema violations', async () => {
     const input = [
       JSON.stringify({ type: 'user', message: { role: 'user', content: 'ok' } }),
       JSON.stringify({ type: 'voodoo' }),
@@ -46,7 +46,7 @@ describe('parseJsonlStream', () => {
     expect(out).toHaveLength(1);
   });
 
-  it('toleruje CRLF', async () => {
+  it('tolerates CRLF line endings', async () => {
     const input = [
       JSON.stringify({ type: 'user', message: { role: 'user', content: 'a' } }),
       JSON.stringify({ type: 'user', message: { role: 'user', content: 'b' } }),
@@ -58,7 +58,7 @@ describe('parseJsonlStream', () => {
     expect(out).toHaveLength(2);
   });
 
-  it('toleruje trailing blank lines', async () => {
+  it('tolerates trailing blank lines', async () => {
     const input =
       JSON.stringify({ type: 'user', message: { role: 'user', content: 'a' } }) + '\n\n\n';
     const out = [];
@@ -68,7 +68,7 @@ describe('parseJsonlStream', () => {
     expect(out).toHaveLength(1);
   });
 
-  it('obsługuje pusty input', async () => {
+  it('handles empty input', async () => {
     const out = [];
     for await (const ev of parseJsonlStream(streamOf(''), { logMalformed: false })) {
       out.push(ev);

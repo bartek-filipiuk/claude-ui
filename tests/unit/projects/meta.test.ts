@@ -52,12 +52,12 @@ async function loadModule() {
 }
 
 describe('readMeta migration', () => {
-  it('zwraca pusty obiekt, gdy brak plików', async () => {
+  it('returns an empty object when no files exist', async () => {
     const { readMeta } = await loadModule();
     expect(await readMeta()).toEqual({});
   });
 
-  it('czyta nowy meta.json', async () => {
+  it('reads the new meta.json format', async () => {
     await writeFile(
       META_FILE,
       JSON.stringify({
@@ -73,7 +73,7 @@ describe('readMeta migration', () => {
     });
   });
 
-  it('migruje stary aliases.json na pierwszym odczycie', async () => {
+  it('migrates the legacy aliases.json on first read', async () => {
     await writeFile(
       LEGACY_ALIASES_FILE,
       JSON.stringify({ '-home-foo': 'Foo', '-home-bar': 'Bar' }),
@@ -86,14 +86,14 @@ describe('readMeta migration', () => {
     });
   });
 
-  it('ignoruje aliases.json, gdy meta.json istnieje', async () => {
+  it('ignores aliases.json when meta.json already exists', async () => {
     await writeFile(META_FILE, JSON.stringify({ '-home-x': { alias: 'New' } }));
     await writeFile(LEGACY_ALIASES_FILE, JSON.stringify({ '-home-x': 'Old' }));
     const { readMeta } = await loadModule();
     expect(await readMeta()).toEqual({ '-home-x': { alias: 'New' } });
   });
 
-  it('pomija niepoprawne wpisy (XSS w aliasie, inne typy)', async () => {
+  it('skips invalid entries (XSS in alias, wrong types)', async () => {
     await writeFile(
       META_FILE,
       JSON.stringify({
@@ -114,7 +114,7 @@ describe('readMeta migration', () => {
 });
 
 describe('setProjectMeta', () => {
-  it('ustawia i czyści favorite, zachowując alias', async () => {
+  it('sets and clears favorite while preserving the alias', async () => {
     const { setProjectMeta, readMeta } = await loadModule();
     await setProjectMeta('-home-a', { alias: 'Alpha' });
     await setProjectMeta('-home-a', { favorite: true });
@@ -126,7 +126,7 @@ describe('setProjectMeta', () => {
     expect(meta['-home-a']).toEqual({ alias: 'Alpha' });
   });
 
-  it('czyści wpis po usunięciu aliasu i odpięciu', async () => {
+  it('drops the entry after removing alias and unpinning', async () => {
     const { setProjectMeta, readMeta } = await loadModule();
     await setProjectMeta('-home-x', { alias: 'X', favorite: true });
     await setProjectMeta('-home-x', { alias: null });
@@ -135,14 +135,14 @@ describe('setProjectMeta', () => {
     expect(meta['-home-x']).toBeUndefined();
   });
 
-  it('odrzuca niepoprawne aliasy', async () => {
+  it('rejects malformed aliases', async () => {
     const { setProjectMeta } = await loadModule();
     await expect(setProjectMeta('-home-x', { alias: 'bad\nname' })).rejects.toThrow(
       'invalid_alias',
     );
   });
 
-  it('favorite po zapisie przeżywa ponowny odczyt', async () => {
+  it('favorite survives a re-read after write', async () => {
     const { setProjectMeta } = await loadModule();
     await setProjectMeta('-home-pin', { favorite: true });
     const raw = JSON.parse(await readFile(META_FILE, 'utf8')) as Record<string, unknown>;
@@ -151,7 +151,7 @@ describe('setProjectMeta', () => {
 });
 
 describe('aliasesFromMeta', () => {
-  it('zwraca tylko wpisy z aliasami', async () => {
+  it('returns only entries that carry an alias', async () => {
     const { aliasesFromMeta } = await loadModule();
     expect(
       aliasesFromMeta({
@@ -163,17 +163,17 @@ describe('aliasesFromMeta', () => {
   });
 });
 
-describe('migracja jako etap kompatybilności', () => {
-  it('setProjectMeta na pustej bazie korzysta z migracji z aliases.json', async () => {
+describe('migration compatibility step', () => {
+  it('setProjectMeta on an empty store picks up aliases.json migration', async () => {
     await writeFile(
       LEGACY_ALIASES_FILE,
-      JSON.stringify({ '-home-old': 'Stary', '-home-keep': 'Zostań' }),
+      JSON.stringify({ '-home-old': 'OldAlias', '-home-keep': 'KeepAlias' }),
     );
     const { setProjectMeta, readMeta } = await loadModule();
     await setProjectMeta('-home-new', { favorite: true });
     const meta = await readMeta();
-    expect(meta['-home-old']).toEqual({ alias: 'Stary' });
-    expect(meta['-home-keep']).toEqual({ alias: 'Zostań' });
+    expect(meta['-home-old']).toEqual({ alias: 'OldAlias' });
+    expect(meta['-home-keep']).toEqual({ alias: 'KeepAlias' });
     expect(meta['-home-new']).toEqual({ favorite: true });
   });
 });

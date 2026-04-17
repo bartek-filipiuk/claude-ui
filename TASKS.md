@@ -461,7 +461,7 @@ build`, `--no-symlink`.
 
 ### T28 — Translate Polish code comments to English
 
-- [ ] **Goal:** remove every Polish-language comment from the
+- [x] **Goal:** remove every Polish-language comment from the
       codebase so maintainers who don't read Polish can still reason
       about the code.
 - **Touch:** every file surfaced by `rg -e '[ąćęłńóśźż]' lib/ tests/
