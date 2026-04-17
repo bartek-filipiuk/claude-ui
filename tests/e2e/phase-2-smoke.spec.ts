@@ -64,7 +64,7 @@ test.beforeAll(async () => {
     env: {
       ...process.env,
       PORT: String(port),
-      CLAUDE_UI_TOKEN: token,
+      CODEHELM_TOKEN: token,
       HOST: '127.0.0.1',
       NODE_ENV: 'test',
       LOG_LEVEL: 'error',

@@ -1,4 +1,4 @@
-const CSRF_COOKIE = 'claude_ui_csrf';
+const CSRF_COOKIE = 'codehelm_csrf';
 
 export function readCsrfCookie(): string | null {
   if (typeof document === 'undefined') return null;

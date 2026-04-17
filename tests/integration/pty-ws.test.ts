@@ -9,8 +9,8 @@ let csrfCookie = '';
 async function getAuthCookies(s: StartedServer) {
   const res = await fetch(`${s.baseUrl}/api/auth?k=${s.token}`, { redirect: 'manual' });
   const cookies = res.headers.getSetCookie();
-  const auth = cookies.find((c) => c.startsWith('claude_ui_auth='))?.split(';', 1)[0] ?? '';
-  const csrf = cookies.find((c) => c.startsWith('claude_ui_csrf='))?.split(';', 1)[0] ?? '';
+  const auth = cookies.find((c) => c.startsWith('codehelm_auth='))?.split(';', 1)[0] ?? '';
+  const csrf = cookies.find((c) => c.startsWith('codehelm_csrf='))?.split(';', 1)[0] ?? '';
   return {
     header: [auth, csrf].filter(Boolean).join('; '),
     csrfValue: csrf.split('=')[1] ?? '',

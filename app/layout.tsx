@@ -7,7 +7,7 @@ import './globals.css';
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: 'claude-ui',
+  title: 'codehelm',
   description: 'Local manager for Claude Code CLI sessions',
   robots: { index: false, follow: false },
 };

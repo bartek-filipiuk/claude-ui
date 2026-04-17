@@ -64,14 +64,14 @@ function runtimeRootDir() {
 async function pickProfileDir() {
   const base = runtimeRootDir();
   const uid = process.getuid ? process.getuid() : 'anon';
-  const dir = join(base, `claude-ui-${uid}-${randomUUID()}`);
+  const dir = join(base, `codehelm-${uid}-${randomUUID()}`);
   await mkdir(dir, { recursive: true, mode: 0o700 });
   await chmod(dir, 0o700);
   return dir;
 }
 
 function chromiumCandidates() {
-  const override = process.env['CLAUDE_UI_CHROMIUM'];
+  const override = process.env['CODEHELM_CHROMIUM'];
   const base = override && override.length > 0 ? [override] : [];
   if (process.platform === 'darwin') {
     return [
@@ -105,7 +105,7 @@ function findChromium() {
     }
   }
   throw new Error(
-    'Chromium/Chrome not found. Install chromium or set CLAUDE_UI_CHROMIUM=/path/to/chrome.',
+    'Chromium/Chrome not found. Install chromium or set CODEHELM_CHROMIUM=/path/to/chrome.',
   );
 }
 
@@ -144,7 +144,7 @@ async function main() {
   const env = {
     ...process.env,
     PORT: String(port),
-    CLAUDE_UI_TOKEN: token,
+    CODEHELM_TOKEN: token,
     HOST: '127.0.0.1',
   };
 
@@ -214,10 +214,10 @@ async function main() {
     cleanup('chrome-exit', 0);
   });
 
-  console.error(`claude-ui ready → http://127.0.0.1:${port}`);
+  console.error(`codehelm ready → http://127.0.0.1:${port}`);
 }
 
 main().catch((err) => {
-  console.error('claude-ui fatal:', err.message);
+  console.error('codehelm fatal:', err.message);
   process.exit(1);
 });

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /* eslint-disable no-console */
 /**
- * One-command setup for the claude-ui launcher. Runs after `git clone`:
+ * One-command setup for the codehelm launcher. Runs after `git clone`:
  *
  *   node bin/install.ts            # full install
  *   node bin/install.ts --dry-run  # report only
@@ -45,7 +45,7 @@ function parseFlags(argv: readonly string[]): Flags {
 }
 
 function printHelp(): void {
-  console.log(`claude-ui installer
+  console.log(`codehelm installer
 
   Usage:
     node bin/install.ts [flags]
@@ -53,7 +53,7 @@ function printHelp(): void {
   Flags:
     --dry-run       Print the plan without touching the filesystem.
     --skip-build    Skip "pnpm build" (development install).
-    --no-symlink    Don't create ~/.local/bin/claude-ui.
+    --no-symlink    Don't create ~/.local/bin/codehelm.
     --help, -h      Show this message.
 `);
 }
@@ -150,8 +150,8 @@ async function main(): Promise<void> {
 
   if (!flags.noSymlink) {
     const binDir = resolveHomeBinDir();
-    const target = join(binDir, 'claude-ui');
-    const source = join(ROOT, 'bin', 'claude-ui');
+    const target = join(binDir, 'codehelm');
+    const source = join(ROOT, 'bin', 'codehelm');
 
     if (flags.dryRun) {
       log('symlink', `would link ${target} -> ${source}`);
@@ -185,10 +185,10 @@ async function main(): Promise<void> {
     }
   }
 
-  log('done', 'Run `claude-ui` to start.');
+  log('done', 'Run `codehelm` to start.');
 }
 
 main().catch((err) => {
-  console.error(`claude-ui install fatal: ${(err as Error).message}`);
+  console.error(`codehelm install fatal: ${(err as Error).message}`);
   process.exit(1);
 });

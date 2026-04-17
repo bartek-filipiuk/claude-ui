@@ -1,6 +1,6 @@
 # PHASE 0 — Setup + security primitives + CI
 
-**Goal**: lay the foundation the remaining phases plug into. Security primitives (token, csrf, host-check, path-guard, csp) are tested **before** anything else. The launcher (`bin/claude-ui`) can bring up a process + Chromium. CI blocks any merge without green tests.
+**Goal**: lay the foundation the remaining phases plug into. Security primitives (token, csrf, host-check, path-guard, csp) are tested **before** anything else. The launcher (`bin/codehelm`) can bring up a process + Chromium. CI blocks any merge without green tests.
 
 **Out**: no UI (placeholder), no JSONL logic, no PTY.
 
@@ -38,16 +38,16 @@
 - [ ] `server.ts` — custom http.Server, Next app, middleware stack (Host → auth → CSRF → Next handler)
 - [ ] `app/api/auth/route.ts` — GET `?k=TOKEN` → timing-safe compare → set HttpOnly+SameSite=Strict cookie + 302 to `/`
 - [ ] `app/api/healthz/route.ts` — auth-exempt, returns `{ status: "ok" }`
-- [ ] `app/layout.tsx` and `app/page.tsx` — minimal placeholder ("claude-ui" + port)
+- [ ] `app/layout.tsx` and `app/page.tsx` — minimal placeholder ("codehelm" + port)
 - [ ] `app/globals.css` — Tailwind setup
 
-### bin/claude-ui launcher
+### bin/codehelm launcher
 
-- [ ] `bin/claude-ui` (executable, shebang `#!/usr/bin/env node` or tsx loader)
+- [ ] `bin/codehelm` (executable, shebang `#!/usr/bin/env node` or tsx loader)
 - [ ] Finds an ephemeral port, generates a 32-byte token
 - [ ] Spawns the server with env: `PORT`, `TOKEN`, `AUDIT_PATH`
 - [ ] Polls `http://127.0.0.1:PORT/healthz` for up to 10 s (100 ms interval) until 200
-- [ ] `mkdir $XDG_RUNTIME_DIR/claude-ui/<uuid>` mode 0700, fallback `/tmp/claude-ui-<uid>-<uuid>` mode 0700
+- [ ] `mkdir $XDG_RUNTIME_DIR/codehelm/<uuid>` mode 0700, fallback `/tmp/codehelm-<uid>-<uuid>` mode 0700
 - [ ] Spawns `chromium --app=http://127.0.0.1:PORT/?k=TOKEN --user-data-dir=<profile>` (or `google-chrome-stable`, fallback detection)
 - [ ] Traps SIGTERM/SIGINT/SIGHUP: kill server child + `rm -rf` profile dir
 - [ ] Exits when Chromium closes (main loop awaits chrome process)
@@ -60,7 +60,7 @@
   - job `integration`: `pnpm test:integration` (supertest)
   - job `audit`: `pnpm audit --prod --audit-level=high`
   - job `smoke`: `pnpm build` + `pnpm exec playwright test tests/e2e/phase-0-smoke.spec.ts`
-- [ ] playwright smoke: `claude-ui` starts, `healthz` 200, port binds on 127.0.0.1 (not 0.0.0.0)
+- [ ] playwright smoke: `codehelm` starts, `healthz` 200, port binds on 127.0.0.1 (not 0.0.0.0)
 
 ## Security gate (every box MUST be ✓ before Phase 1)
 

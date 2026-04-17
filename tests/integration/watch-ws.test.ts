@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { startServer, type StartedServer } from './helpers/start-server';
 
 function buildFakeHome() {
-  const home = mkdtempSync(`${tmpdir()}/claude-ui-watch-`);
+  const home = mkdtempSync(`${tmpdir()}/codehelm-watch-`);
   mkdirSync(`${home}/.claude/projects`, { recursive: true });
   return home;
 }

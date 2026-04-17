@@ -63,7 +63,7 @@ describe('loadWidths', () => {
     expect(loadWidths()).toEqual({ sidebar: DEFAULT_SIDEBAR, sessions: DEFAULT_SESSIONS });
   });
 
-  it('odczytuje z localStorage pod kluczem claude-ui:layout', () => {
+  it('reads from localStorage under the codehelm:layout key', () => {
     window.localStorage.setItem(
       LAYOUT_STORAGE_KEY,
       JSON.stringify({ sidebar: 500, sessions: 300 }),
@@ -114,7 +114,7 @@ describe('<ResizableColumns />', () => {
     expect(template).toContain('280px');
   });
 
-  it('persists new widths to localStorage under claude-ui:layout', async () => {
+  it('persists new widths to localStorage under codehelm:layout', async () => {
     renderLayout();
     await act(async () => {});
     const splitter = screen.getByTestId('splitter-sidebar');

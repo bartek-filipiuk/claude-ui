@@ -1,4 +1,4 @@
-export const LAYOUT_STORAGE_KEY = 'claude-ui:layout';
+export const LAYOUT_STORAGE_KEY = 'codehelm:layout';
 
 export type SortMode = 'activity' | 'name' | 'sessions';
 export type ProjectGrouping = 'flat' | 'prefix';

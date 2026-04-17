@@ -35,7 +35,7 @@
 - [ ] Empty state for 0 projects (message + link to Claude Code docs)
 - [ ] Loading skeleton (shadcn `Skeleton`) during fetch
 - [ ] Error state with a retry button
-- [ ] Slug → display name (e.g. `-home-bartek-main-projects-claude-ui` → `~/main-projects/claude-ui`)
+- [ ] Slug → display name (e.g. `-home-bartek-main-projects-codehelm` → `~/main-projects/codehelm`)
 - [ ] Tooltip on a project reveals the full path
 - [ ] Sessions sort by `lastActivity` DESC by default, with an "oldest first" toggle
 
@@ -44,7 +44,7 @@
 - [ ] `tests/unit/components/ProjectList.test.tsx` — render 50 projects, search filters down
 - [ ] `tests/unit/components/Search.test.tsx` — debounce works (fake timers)
 - [ ] `tests/e2e/phase-2-smoke.spec.ts` — playwright:
-  - launch `claude-ui`, Chromium opens
+  - launch `codehelm`, Chromium opens
   - project list from the fixture is visible
   - clicking a project shows the session list
   - search "home" narrows to matching projects

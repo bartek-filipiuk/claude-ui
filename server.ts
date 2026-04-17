@@ -40,7 +40,7 @@ async function main(): Promise<void> {
     });
   });
 
-  logger.info({ port }, 'claude_ui_ready');
+  logger.info({ port }, 'codehelm_ready');
 
   const shutdown = (signal: string) => {
     logger.info({ signal }, 'shutting_down');

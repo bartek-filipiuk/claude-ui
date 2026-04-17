@@ -1,4 +1,4 @@
-export const RECENT_FILES_KEY = 'claude-ui:recent-md';
+export const RECENT_FILES_KEY = 'codehelm:recent-md';
 export const RECENT_FILES_MAX = 10;
 
 export type RecentFileKind = 'global' | 'project';

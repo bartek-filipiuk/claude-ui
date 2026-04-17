@@ -50,7 +50,7 @@ export function usePty(events: PtyEvents) {
   const connect = useCallback(
     (cfg: SpawnConfig) => {
       if (wsRef.current) return;
-      const csrf = readCookie('claude_ui_csrf') ?? '';
+      const csrf = readCookie('codehelm_csrf') ?? '';
       setAndEmit('connecting');
       const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       const ws = new WebSocket(`${proto}//${window.location.host}/api/ws/pty`);

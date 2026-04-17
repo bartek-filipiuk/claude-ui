@@ -24,19 +24,19 @@ vi.mock('@/lib/server/config', () => {
       get CLAUDE_GLOBAL_MD() {
         return join(tmpHome, '.claude', 'CLAUDE.md');
       },
-      get CLAUDE_UI_STATE_DIR() {
-        return join(tmpHome, '.claude', 'claude-ui');
+      get CODEHELM_STATE_DIR() {
+        return join(tmpHome, '.codehelm');
       },
       get AUDIT_LOG() {
-        return join(tmpHome, '.claude', 'claude-ui', 'audit.log');
+        return join(tmpHome, '.codehelm', 'audit.log');
       },
     },
   };
 });
 
 beforeEach(async () => {
-  tmpHome = join(tmpdir(), `claude-ui-meta-${randomBytes(6).toString('hex')}`);
-  stateDir = join(tmpHome, '.claude', 'claude-ui');
+  tmpHome = join(tmpdir(), `codehelm-meta-${randomBytes(6).toString('hex')}`);
+  stateDir = join(tmpHome, '.codehelm');
   META_FILE = join(stateDir, 'meta.json');
   LEGACY_ALIASES_FILE = join(stateDir, 'aliases.json');
   await mkdir(stateDir, { recursive: true });

@@ -54,7 +54,7 @@ function waitHealth(port: number, timeoutMs = 20_000): Promise<void> {
 }
 
 function buildFakeHome() {
-  const home = mkdtempSync(`${tmpdir()}/claude-ui-phase6-`);
+  const home = mkdtempSync(`${tmpdir()}/codehelm-phase6-`);
   const pdir = `${home}/alpha`;
   mkdirSync(pdir, { recursive: true });
   const slug = pdir.replace(/\//g, '-');
@@ -90,7 +90,7 @@ test.beforeAll(async () => {
     env: {
       ...process.env,
       PORT: String(port),
-      CLAUDE_UI_TOKEN: token,
+      CODEHELM_TOKEN: token,
       HOST: '127.0.0.1',
       NODE_ENV: 'test',
       LOG_LEVEL: 'error',
