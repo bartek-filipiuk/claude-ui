@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useSettings } from '@/hooks/use-settings';
 import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
 import { useSessionStream } from '@/hooks/use-session-stream';
 import { useUiStore } from '@/stores/ui-slice';
@@ -37,11 +38,20 @@ export function Viewer() {
   const pendingEventIndex = useUiStore((s) => s.pendingEventIndex);
   const consumePendingEvent = useUiStore((s) => s.consumePendingEvent);
   const { events, loading, error, done, bytes } = useSessionStream(slug, sessionId);
+  const { data: settings } = useSettings();
+  const settingsHiddenKey = (settings?.hiddenCategories ?? []).slice().sort().join(',');
   const [query, setQuery] = useState('');
   const [hitIndex, setHitIndex] = useState(0);
   const [jumpQuery, setJumpQuery] = useState('');
   const [follow, setFollow] = useState(true);
-  const [hidden, setHidden] = useState<Set<Category>>(new Set());
+  const [hidden, setHidden] = useState<Set<Category>>(
+    () => new Set(settings?.hiddenCategories ?? []),
+  );
+
+  useEffect(() => {
+    setHidden(new Set(settings?.hiddenCategories ?? []));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionId, settingsHiddenKey]);
   const [onlyHits, setOnlyHits] = useState(false);
   const [visibleRange, setVisibleRange] = useState<{ start: number; end: number }>({
     start: 0,

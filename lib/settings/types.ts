@@ -4,6 +4,7 @@ import {
   MODEL_RATE_KEYS,
   type ModelPricing,
 } from '@/lib/jsonl/usage';
+import { EVENT_CATEGORIES, type EventCategory } from '@/lib/jsonl/outline';
 
 // Pure types + constants + zod schemas. No node imports so client bundles
 // (SettingsDialog, useSettings, SettingsApplier) can pull from here safely.
@@ -25,6 +26,7 @@ export interface Settings {
   viewerDensity: ViewerDensity;
   theme: Theme;
   modelPricing: ModelPricing;
+  hiddenCategories: EventCategory[];
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -33,6 +35,7 @@ export const DEFAULT_SETTINGS: Settings = {
   viewerDensity: 'comfortable',
   theme: 'dark',
   modelPricing: DEFAULT_MODEL_PRICING,
+  hiddenCategories: [],
 };
 
 const nonNegative = z.number().nonnegative().finite();
@@ -57,6 +60,7 @@ export const SettingsSchema = z.object({
   viewerDensity: z.enum(VIEWER_DENSITIES),
   theme: z.enum(THEMES),
   modelPricing: ModelPricingSchema,
+  hiddenCategories: z.array(z.enum(EVENT_CATEGORIES)),
 });
 
 export const SettingsPatchSchema = SettingsSchema.partial();

@@ -29,6 +29,8 @@ import {
   type ModelRate,
   type ModelRateKey,
 } from '@/lib/jsonl/usage';
+import { EVENT_CATEGORIES, type EventCategory } from '@/lib/jsonl/outline';
+import { cn } from '@/lib/utils';
 
 const VIEWER_FONT_LABEL: Record<ViewerFontSize, string> = {
   xs: 'Bardzo mały',
@@ -56,6 +58,13 @@ const MODEL_LABEL: Record<ModelRateKey, string> = {
   default: 'Domyślny (nieznany model)',
 };
 
+const CATEGORY_LABEL: Record<EventCategory, string> = {
+  user: 'Użytkownik',
+  assistant: 'Asystent',
+  tools: 'Narzędzia',
+  system: 'System',
+};
+
 const RATE_FIELDS: { key: keyof ModelRate; label: string }[] = [
   { key: 'input', label: 'Wejście' },
   { key: 'output', label: 'Wyjście' },
@@ -81,6 +90,15 @@ export function SettingsDialog() {
       [model]: { ...current.modelPricing[model], [field]: value },
     };
     update('modelPricing', nextPricing);
+  };
+
+  const toggleCategory = (c: EventCategory) => {
+    const current_ = new Set(current.hiddenCategories);
+    if (current_.has(c)) current_.delete(c);
+    else current_.add(c);
+    // Keep order stable by filtering against the canonical list.
+    const next = EVENT_CATEGORIES.filter((x) => current_.has(x));
+    update('hiddenCategories', next);
   };
 
   return (
@@ -169,6 +187,36 @@ export function SettingsDialog() {
               ))}
             </select>
           </Field>
+
+          <fieldset className="flex flex-col gap-2 border-t border-neutral-800 pt-4">
+            <legend className="text-neutral-300">Domyślnie ukryte kategorie</legend>
+            <p className="text-[11px] text-neutral-500">
+              Wybrane kategorie startują ukryte przy otwarciu sesji. Chipsy w
+              widoku sesji nadal można przełączać lokalnie.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {EVENT_CATEGORIES.map((c) => {
+                const hidden = current.hiddenCategories.includes(c);
+                return (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => toggleCategory(c)}
+                    disabled={isPending}
+                    aria-pressed={hidden}
+                    className={cn(
+                      'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors',
+                      hidden
+                        ? 'border-neutral-600 bg-neutral-800 text-neutral-100'
+                        : 'border-neutral-800 bg-neutral-950 text-neutral-500 hover:text-neutral-300',
+                    )}
+                  >
+                    {CATEGORY_LABEL[c]}
+                  </button>
+                );
+              })}
+            </div>
+          </fieldset>
 
           <fieldset className="flex flex-col gap-2 border-t border-neutral-800 pt-4">
             <legend className="text-neutral-300">Cennik modeli (USD / 1 mln tokenów)</legend>

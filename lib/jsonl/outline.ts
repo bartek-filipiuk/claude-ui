@@ -1,8 +1,7 @@
 import type { JsonlEvent } from './types';
 
-export type EventCategory = 'user' | 'assistant' | 'tools' | 'system';
-
-export const EVENT_CATEGORIES: EventCategory[] = ['user', 'assistant', 'tools', 'system'];
+export const EVENT_CATEGORIES = ['user', 'assistant', 'tools', 'system'] as const;
+export type EventCategory = (typeof EVENT_CATEGORIES)[number];
 
 function contentHasTool(content: unknown): boolean {
   if (!Array.isArray(content)) return false;
