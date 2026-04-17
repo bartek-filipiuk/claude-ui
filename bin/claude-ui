@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 /* eslint-disable no-console */
-import { spawn, spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { mkdir, rm, chmod } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import { randomBytes, randomUUID } from 'node:crypto';
-import { existsSync } from 'node:fs';
+import { accessSync, constants as fsConstants, existsSync, realpathSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { request } from 'node:http';
@@ -50,8 +51,18 @@ function osAssignedPort() {
   });
 }
 
+function runtimeRootDir() {
+  const candidates = [process.env['XDG_RUNTIME_DIR'], process.env['TMPDIR'], tmpdir()].filter(
+    (v) => typeof v === 'string' && v.length > 0,
+  );
+  for (const dir of candidates) {
+    if (existsSync(dir)) return dir;
+  }
+  return tmpdir();
+}
+
 async function pickProfileDir() {
-  const base = process.env['XDG_RUNTIME_DIR'] ?? process.env['TMPDIR'] ?? '/tmp';
+  const base = runtimeRootDir();
   const uid = process.getuid ? process.getuid() : 'anon';
   const dir = join(base, `claude-ui-${uid}-${randomUUID()}`);
   await mkdir(dir, { recursive: true, mode: 0o700 });
@@ -59,30 +70,43 @@ async function pickProfileDir() {
   return dir;
 }
 
+function chromiumCandidates() {
+  const override = process.env['CLAUDE_UI_CHROMIUM'];
+  const base = override && override.length > 0 ? [override] : [];
+  if (process.platform === 'darwin') {
+    return [
+      ...base,
+      '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+      '/Applications/Chromium.app/Contents/MacOS/Chromium',
+      '/Applications/Arc.app/Contents/MacOS/Arc',
+      '/Applications/Brave Browser.app/Contents/MacOS/Brave Browser',
+      '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
+    ];
+  }
+  return [
+    ...base,
+    '/usr/bin/chromium',
+    '/usr/bin/chromium-browser',
+    '/usr/bin/google-chrome-stable',
+    '/usr/bin/google-chrome',
+    '/snap/bin/chromium',
+  ];
+}
+
 function findChromium() {
-  const candidates = [
-    process.env['CLAUDE_UI_CHROMIUM'],
-    'chromium',
-    'chromium-browser',
-    'google-chrome-stable',
-    'google-chrome',
-  ].filter(Boolean);
-  for (const cmd of candidates) {
-    const path = tryWhich(cmd);
-    if (path) return path;
+  for (const candidate of chromiumCandidates()) {
+    if (!candidate) continue;
+    try {
+      const resolved = realpathSync(candidate);
+      accessSync(resolved, fsConstants.X_OK);
+      return resolved;
+    } catch {
+      // try next
+    }
   }
   throw new Error(
     'Chromium/Chrome not found. Install chromium or set CLAUDE_UI_CHROMIUM=/path/to/chrome.',
   );
-}
-
-function tryWhich(cmd) {
-  const res = spawnSync('which', [cmd], { encoding: 'utf8' });
-  if (res.status === 0) {
-    const out = (res.stdout ?? '').trim();
-    if (out) return out;
-  }
-  return null;
 }
 
 function waitForHealth(port, attempts = 100, intervalMs = 100) {

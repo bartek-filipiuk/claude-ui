@@ -2,6 +2,7 @@ import * as nodePty from '@homebridge/node-pty-prebuilt-multiarch';
 import type { IPty } from '@homebridge/node-pty-prebuilt-multiarch';
 import { assertInside } from '@/lib/security/path-guard';
 import { PATHS } from '@/lib/server/config';
+import { defaultShell } from '@/lib/server/platform';
 
 export interface SpawnOptions {
   cwd: string;
@@ -20,9 +21,8 @@ export interface SpawnedPty {
 }
 
 function resolveShell(override?: string): string {
-  const candidate = override ?? process.env['SHELL'] ?? '/bin/bash';
-  if (!candidate.startsWith('/')) return '/bin/bash';
-  return candidate;
+  if (override && override.startsWith('/')) return override;
+  return defaultShell();
 }
 
 /**
