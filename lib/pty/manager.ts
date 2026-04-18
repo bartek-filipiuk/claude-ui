@@ -4,9 +4,12 @@ import { spawnPty, type SpawnOptions } from './spawn';
 import { auditPty } from './audit';
 import { LIMITS } from '@/lib/server/config';
 import { logger } from '@/lib/server/logger';
+import { isReadyHybrid } from './ready-check';
 
 export type DataListener = (chunk: string) => void;
 export type ExitListener = (info: { exitCode: number; signal?: number }) => void;
+
+const RING_BYTES = 2048;
 
 export interface PtyHandle {
   id: string;
@@ -23,9 +26,16 @@ export interface PtyHandle {
   onExit(listener: ExitListener): () => void;
   /** Client ACK — releases `bytes` worth of unacked buffer. */
   ack(bytes: number): void;
+  /** Returns the last N bytes of stdout as UTF-8. */
+  getBufferTail(n?: number): string;
+  /** Timestamp (ms) of the most recent stdout chunk from the PTY. */
+  readonly lastDataAt: number;
+  /** Hybrid ready-check: marker-in-buffer OR idle > IDLE_READY_MS. */
+  isReady(): boolean;
   /** Current unacked-bytes counter (for tests). */
   readonly unacked: number;
   readonly paused: boolean;
+  readonly exited: boolean;
 }
 
 interface InternalHandle extends PtyHandle {
@@ -35,6 +45,47 @@ interface InternalHandle extends PtyHandle {
   _unacked: number;
   _paused: boolean;
   _exited: boolean;
+  _ring: Buffer;
+  _ringWritten: number;
+  _ringHead: number;
+  _lastDataAt: number;
+}
+
+function writeToRing(handle: InternalHandle, chunk: Buffer): void {
+  const ring = handle._ring;
+  const cap = ring.length;
+  if (chunk.length >= cap) {
+    chunk.copy(ring, 0, chunk.length - cap);
+    handle._ringHead = 0;
+    handle._ringWritten = cap;
+    return;
+  }
+  const end = handle._ringHead + chunk.length;
+  if (end <= cap) {
+    chunk.copy(ring, handle._ringHead);
+  } else {
+    const first = cap - handle._ringHead;
+    chunk.copy(ring, handle._ringHead, 0, first);
+    chunk.copy(ring, 0, first);
+  }
+  handle._ringHead = end % cap;
+  handle._ringWritten = Math.min(cap, handle._ringWritten + chunk.length);
+}
+
+function readRingTail(handle: InternalHandle, n: number): string {
+  const cap = handle._ring.length;
+  const size = Math.min(n, handle._ringWritten);
+  if (size === 0) return '';
+  if (handle._ringWritten < cap) {
+    return handle._ring.subarray(handle._ringHead - size, handle._ringHead).toString('utf8');
+  }
+  const start = (handle._ringHead + cap - size) % cap;
+  if (start + size <= cap) {
+    return handle._ring.subarray(start, start + size).toString('utf8');
+  }
+  const first = handle._ring.subarray(start).toString('binary');
+  const second = handle._ring.subarray(0, size - (cap - start)).toString('binary');
+  return Buffer.from(first + second, 'binary').toString('utf8');
 }
 
 class PtyManager {
@@ -95,11 +146,21 @@ class PtyManager {
       _unacked: 0,
       _paused: false,
       _exited: false,
+      _ring: Buffer.alloc(RING_BYTES),
+      _ringWritten: 0,
+      _ringHead: 0,
+      _lastDataAt: Date.now(),
       get unacked() {
         return this._unacked;
       },
       get paused() {
         return this._paused;
+      },
+      get exited() {
+        return this._exited;
+      },
+      get lastDataAt() {
+        return this._lastDataAt;
       },
       write(data: string) {
         if (this._exited) return;
@@ -140,10 +201,20 @@ class PtyManager {
           }
         }
       },
+      getBufferTail(n = RING_BYTES) {
+        return readRingTail(this, Math.min(n, RING_BYTES));
+      },
+      isReady() {
+        const tail = readRingTail(this, RING_BYTES);
+        return isReadyHybrid(tail, this._lastDataAt);
+      },
     };
 
     pty.onData((chunk: string) => {
-      handle._unacked += Buffer.byteLength(chunk, 'utf8');
+      const buf = Buffer.from(chunk, 'utf8');
+      handle._unacked += buf.length;
+      handle._lastDataAt = Date.now();
+      writeToRing(handle, buf);
       if (!handle._paused && handle._unacked > LIMITS.PTY_UNACKED_MAX_BYTES) {
         handle._paused = true;
         try {

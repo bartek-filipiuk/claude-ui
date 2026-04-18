@@ -7,6 +7,8 @@ import { runMiddleware } from '@/lib/server/middleware';
 import { attachUpgradeRouter } from '@/lib/ws/server';
 import { ptyManager } from '@/lib/pty/manager';
 import { projectsWatcher } from '@/lib/watcher/chokidar';
+import { restoreAllAtStartup } from '@/lib/pty/persistent-tabs-service';
+import { cronScheduler } from '@/lib/cron/scheduler';
 
 const dev = process.env['NODE_ENV'] !== 'production';
 
@@ -42,8 +44,20 @@ async function main(): Promise<void> {
 
   logger.info({ port }, 'codehelm_ready');
 
+  try {
+    await restoreAllAtStartup();
+  } catch (err) {
+    logger.error({ err: (err as Error).message }, 'persistent_tabs_restore_failed');
+  }
+  try {
+    await cronScheduler.load();
+  } catch (err) {
+    logger.error({ err: (err as Error).message }, 'cron_scheduler_load_failed');
+  }
+
   const shutdown = (signal: string) => {
     logger.info({ signal }, 'shutting_down');
+    cronScheduler.stop();
     ptyManager.killAll('SIGTERM');
     void projectsWatcher.stop();
     httpServer.close(() => process.exit(0));

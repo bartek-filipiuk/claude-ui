@@ -22,11 +22,23 @@ export interface TerminalProps {
    * `sendToActive` without prop-drilling.
    */
   paneId?: string;
+  /**
+   * Attach to an existing persistent PTY instead of spawning one. The PTY
+   * survives tab close and browser reload; cron jobs can write to it.
+   */
+  persistentId?: string;
 }
 
 const RESIZE_DEBOUNCE_MS = 100;
 
-export function Terminal({ cwd, shell, args, initCommand, paneId }: TerminalProps) {
+export function Terminal({
+  cwd,
+  shell,
+  args,
+  initCommand,
+  paneId,
+  persistentId,
+}: TerminalProps) {
   const registerWriter = useTerminalStore((s) => s.registerWriter);
   const unregisterWriter = useTerminalStore((s) => s.unregisterWriter);
   const [gitStatus, setGitStatus] = useState<{ branch: string | null; dirty: boolean } | null>(
@@ -159,6 +171,7 @@ export function Terminal({ cwd, shell, args, initCommand, paneId }: TerminalProp
         rows,
         ...(shell ? { shell } : {}),
         ...(args ? { args } : {}),
+        ...(persistentId ? { persistentId } : {}),
       });
     })();
     return () => {
@@ -295,6 +308,7 @@ export function Terminal({ cwd, shell, args, initCommand, paneId }: TerminalProp
                 rows,
                 ...(shell ? { shell } : {}),
                 ...(args ? { args } : {}),
+                ...(persistentId ? { persistentId } : {}),
               });
             }}
           >

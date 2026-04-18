@@ -18,6 +18,8 @@ export interface SpawnConfig {
   rows: number;
   shell?: string;
   args?: string[];
+  /** If set, attach to an existing persistent PTY instead of spawning. */
+  persistentId?: string;
 }
 
 function readCookie(name: string): string | null {
@@ -27,16 +29,16 @@ function readCookie(name: string): string | null {
 }
 
 /**
- * Opens a WebSocket to /api/ws/pty, spawns the session, pumps input/output.
- * Client ACKs every ACK_CHUNK bytes to release server-side backpressure.
+ * Opens a WebSocket to /api/ws/pty, spawns (or attaches to) the session,
+ * pumps input/output. Client ACKs every ACK_CHUNK bytes to release
+ * server-side backpressure.
  */
 export function usePty(events: PtyEvents) {
   const [status, setStatus] = useState<PtyStatus>('closed');
   const wsRef = useRef<WebSocket | null>(null);
   const receivedRef = useRef(0);
   const spawnedRef = useRef(false);
-  // Stable refs for event handlers. Updated in an effect so we don't write
-  // during render (react-hooks plugin forbids it).
+  const persistentRef = useRef(false);
   const eventsRef = useRef(events);
   useEffect(() => {
     eventsRef.current = events;
@@ -55,18 +57,30 @@ export function usePty(events: PtyEvents) {
       const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       const ws = new WebSocket(`${proto}//${window.location.host}/api/ws/pty`);
       wsRef.current = ws;
+      persistentRef.current = Boolean(cfg.persistentId);
 
       ws.onopen = () => {
-        const spawn: Record<string, unknown> = {
-          type: 'spawn',
-          csrf,
-          cwd: cfg.cwd,
-          cols: cfg.cols,
-          rows: cfg.rows,
-        };
-        if (cfg.shell) spawn['shell'] = cfg.shell;
-        if (cfg.args) spawn['args'] = cfg.args;
-        ws.send(JSON.stringify(spawn));
+        if (cfg.persistentId) {
+          const attach: Record<string, unknown> = {
+            type: 'attach',
+            csrf,
+            persistentId: cfg.persistentId,
+            cols: cfg.cols,
+            rows: cfg.rows,
+          };
+          ws.send(JSON.stringify(attach));
+        } else {
+          const spawn: Record<string, unknown> = {
+            type: 'spawn',
+            csrf,
+            cwd: cfg.cwd,
+            cols: cfg.cols,
+            rows: cfg.rows,
+          };
+          if (cfg.shell) spawn['shell'] = cfg.shell;
+          if (cfg.args) spawn['args'] = cfg.args;
+          ws.send(JSON.stringify(spawn));
+        }
       };
 
       ws.onmessage = (ev) => {
@@ -76,8 +90,11 @@ export function usePty(events: PtyEvents) {
         } catch {
           return;
         }
-        if (msg['type'] === 'spawned') {
+        if (msg['type'] === 'spawned' || msg['type'] === 'attached') {
           spawnedRef.current = true;
+          if (msg['type'] === 'attached' && typeof msg['tail'] === 'string' && msg['tail']) {
+            eventsRef.current.onData?.(msg['tail'] as string);
+          }
           setAndEmit('ready');
         } else if (msg['type'] === 'data') {
           const chunk = String(msg['data'] ?? '');
@@ -125,7 +142,11 @@ export function usePty(events: PtyEvents) {
     const ws = wsRef.current;
     if (!ws) return;
     try {
-      ws.send(JSON.stringify({ type: 'kill' }));
+      if (persistentRef.current) {
+        ws.send(JSON.stringify({ type: 'detach' }));
+      } else {
+        ws.send(JSON.stringify({ type: 'kill' }));
+      }
     } catch {
       /* ignore */
     }
@@ -136,6 +157,7 @@ export function usePty(events: PtyEvents) {
     }
     wsRef.current = null;
     spawnedRef.current = false;
+    persistentRef.current = false;
   }, []);
 
   useEffect(() => {

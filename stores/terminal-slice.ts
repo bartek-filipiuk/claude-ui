@@ -9,6 +9,8 @@ export interface TerminalPane {
   shell?: string;
   args?: string[];
   initCommand?: string;
+  /** If set, the pane attaches to a persistent PTY instead of spawning. */
+  persistentId?: string;
 }
 
 export interface TerminalTab {
@@ -40,6 +42,8 @@ export interface TerminalCfg {
   initCommand?: string;
   title: string;
   aliasKey?: string;
+  /** Attach to existing persistent PTY instead of spawning a new one. */
+  persistentId?: string;
 }
 
 const MAX_TABS = 16;
@@ -91,6 +95,7 @@ export const useTerminalStore = create<State>((set, get) => ({
       ...(cfg.shell !== undefined ? { shell: cfg.shell } : {}),
       ...(cfg.args !== undefined ? { args: cfg.args } : {}),
       ...(cfg.initCommand !== undefined ? { initCommand: cfg.initCommand } : {}),
+      ...(cfg.persistentId !== undefined ? { persistentId: cfg.persistentId } : {}),
     };
     const tab: TerminalTab = {
       id,
