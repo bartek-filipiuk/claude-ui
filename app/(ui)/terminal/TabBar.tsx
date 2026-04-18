@@ -1,7 +1,6 @@
 'use client';
 
 import { useTerminalStore, TERMINAL_TAB_CAP } from '@/stores/terminal-slice';
-import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { toastInfo } from '@/lib/ui/toast';
 
@@ -25,58 +24,48 @@ export function TabBar({ onNewTab }: Props) {
   };
 
   return (
-    <div className="flex items-center gap-1 border-b border-neutral-800 bg-neutral-950 px-2 py-1">
-      <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
-        {tabs.map((t) => (
-          <div
-            key={t.id}
-            role="tab"
-            aria-selected={t.id === activeId}
-            onMouseDown={(e) => {
-              if (e.button === 1) {
-                e.preventDefault();
-                closeWithToast(t.id);
-              }
+    <div className="tabs-row">
+      {tabs.map((t) => (
+        <div
+          key={t.id}
+          role="tab"
+          aria-selected={t.id === activeId}
+          className={cn('tab', t.id === activeId && 'active')}
+          title={`${t.title} · ${t.cwd}`}
+          onClick={() => setActive(t.id)}
+          onMouseDown={(e) => {
+            if (e.button === 1) {
+              e.preventDefault();
+              closeWithToast(t.id);
+            }
+          }}
+        >
+          <span className="dot ready" />
+          <span className="mono">{t.title}</span>
+          <button
+            type="button"
+            className="close"
+            aria-label="Close tab"
+            onClick={(e) => {
+              e.stopPropagation();
+              closeWithToast(t.id);
             }}
-            className={cn(
-              'group flex max-w-[180px] shrink-0 items-center gap-1 rounded-md border px-2 py-1 text-xs',
-              t.id === activeId
-                ? 'border-neutral-600 bg-neutral-800 text-neutral-100'
-                : 'border-neutral-800 bg-neutral-950 text-neutral-400 hover:border-neutral-700 hover:text-neutral-200',
-            )}
           >
-            <button
-              type="button"
-              onClick={() => setActive(t.id)}
-              className="min-w-0 flex-1 truncate text-left"
-              title={`${t.title} · ${t.cwd}`}
-            >
-              {t.title}
-            </button>
-            <button
-              type="button"
-              aria-label="Close tab"
-              onClick={(e) => {
-                e.stopPropagation();
-                closeWithToast(t.id);
-              }}
-              className="rounded px-1 text-neutral-500 hover:bg-neutral-700 hover:text-neutral-100"
-            >
-              ×
-            </button>
-          </div>
-        ))}
-      </div>
+            ×
+          </button>
+        </div>
+      ))}
       {onNewTab && (
-        <Button
-          size="sm"
-          variant="outline"
+        <button
+          type="button"
+          className="tab-add"
           disabled={tabs.length >= TERMINAL_TAB_CAP}
           onClick={onNewTab}
           title={tabs.length >= TERMINAL_TAB_CAP ? '16-tab limit reached' : 'New tab'}
+          aria-label="New tab"
         >
           +
-        </Button>
+        </button>
       )}
     </div>
   );

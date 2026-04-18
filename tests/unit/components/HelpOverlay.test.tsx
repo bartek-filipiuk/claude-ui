@@ -36,7 +36,7 @@ describe('<HelpOverlay />', () => {
       dispatchQuestionKey();
     });
     expect(screen.getByRole('dialog')).toBeDefined();
-    expect(screen.getByText('Keyboard shortcuts')).toBeDefined();
+    expect(screen.getAllByText('Keyboard shortcuts').length).toBeGreaterThan(0);
     act(() => {
       dispatchQuestionKey();
     });
@@ -54,11 +54,11 @@ describe('<HelpOverlay />', () => {
     input.remove();
   });
 
-  it('renders a shortcut for Ctrl+K', () => {
+  it('renders the command-palette shortcut row', () => {
     render(<HelpOverlay />);
     act(() => {
       dispatchQuestionKey();
     });
-    expect(screen.getByText('Ctrl+K')).toBeDefined();
+    expect(screen.getByText('Open command palette')).toBeDefined();
   });
 });

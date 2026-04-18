@@ -6,12 +6,11 @@ import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
 import { useSessionStream } from '@/hooks/use-session-stream';
 import { useUiStore } from '@/stores/ui-slice';
 import { searchInEvents } from '@/lib/jsonl/search';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { CHButton } from '@/components/ui/ch-button';
+import { IconSearch } from '@/components/ui/icons';
 import { renderEvent } from '@/components/conversation/messages';
 import type { JsonlEvent } from '@/lib/jsonl/types';
-import { cn } from '@/lib/utils';
 import {
   categorizeEvent as categorize,
   EVENT_CATEGORIES as ALL_CATEGORIES,
@@ -24,6 +23,7 @@ import { StatsBar } from './StatsBar';
 import { ReplayBar } from './ReplayBar';
 import { useReplay } from '@/hooks/use-replay';
 import { toastError } from '@/lib/ui/toast';
+import { cn } from '@/lib/utils';
 
 const CATEGORY_LABEL: Record<Category, string> = {
   user: 'User',
@@ -70,13 +70,9 @@ export function Viewer() {
   const toolUseRegistry = useMemo(() => buildToolUseRegistry(events), [events]);
   const parentToolUseRegistry = useMemo(() => buildParentToolUseRegistry(events), [events]);
 
-  // Hit-set used both for navigation and for "only hits" mode.
   const hits = useMemo(() => searchInEvents(events, query, { limit: 500 }), [events, query]);
   const hitEventIndexSet = useMemo(() => new Set(hits.map((h) => h.eventIndex)), [hits]);
 
-  // Consume a one-shot jump request from the Graph (or any producer). Runs when
-  // the event index lands within the currently loaded event list. All state
-  // mutations are deferred so they don't happen synchronously in the effect body.
   useEffect(() => {
     if (pendingEventIndex == null) return;
     if (pendingEventIndex >= events.length) return;
@@ -92,10 +88,6 @@ export function Viewer() {
     });
   }, [pendingEventIndex, events.length, consumePendingEvent]);
 
-  // Filter events (kept as pairs so navigation can still hop into filtered list).
-  // In Replay mode the source list is capped to the "revealed" count so the
-  // user sees only the already-played-back slice. Search and category filters
-  // still apply on top — useful for post-mortem drilling.
   const visibleEvents = useMemo(() => {
     const cap = replayState.active ? replayState.revealed : events.length;
     const out: { ev: JsonlEvent; origIndex: number }[] = [];
@@ -109,7 +101,6 @@ export function Viewer() {
     return out;
   }, [events, hidden, onlyHits, query, hitEventIndexSet, replayState.active, replayState.revealed]);
 
-  // Auto-scroll to the newest revealed event while playback is advancing.
   useEffect(() => {
     if (!replayState.active || !replayState.playing) return;
     if (visibleEvents.length === 0) return;
@@ -120,7 +111,6 @@ export function Viewer() {
     });
   }, [replayState.active, replayState.playing, visibleEvents.length]);
 
-  // Space toggles play/pause during replay (unless focus is in an input).
   useEffect(() => {
     if (!replayState.active) return;
     const handler = (e: KeyboardEvent) => {
@@ -137,7 +127,10 @@ export function Viewer() {
 
   if (!sessionId) {
     return (
-      <div className="flex h-full items-center justify-center p-8 text-sm text-neutral-500">
+      <div
+        className="flex h-full items-center justify-center p-8 text-sm"
+        style={{ color: 'var(--fg-3)' }}
+      >
         Pick a session to start.
       </div>
     );
@@ -170,7 +163,6 @@ export function Viewer() {
     setHitIndex(idx);
     const hit = hits[idx];
     if (!hit) return;
-    // Translate original event index to position in the (possibly filtered) list.
     const visibleIdx = visibleEvents.findIndex((v) => v.origIndex === hit.eventIndex);
     if (visibleIdx >= 0) {
       virtuosoRef.current?.scrollToIndex({ index: visibleIdx, align: 'center' });
@@ -181,56 +173,62 @@ export function Viewer() {
     <div
       className="flex h-full min-h-0 flex-col"
       style={{
-        fontSize: 'var(--ui-viewer-font-size, 14px)',
-        lineHeight: 'var(--ui-viewer-line-height, 1.5)',
+        fontSize: 'var(--ui-viewer-font-size, var(--viewer-size, 13.5px))',
+        lineHeight: 'var(--ui-viewer-line-height, var(--viewer-line, 1.55))',
       }}
     >
       <StatsBar events={events} />
-      <div className="flex items-center gap-2 border-b border-neutral-800 bg-neutral-950 px-4 py-2">
-        <div className="relative flex-1">
-          <Input
+
+      <div className="viewer-toolbar">
+        <div className="search-wrap">
+          <span className="icon">
+            <IconSearch />
+          </span>
+          <input
             type="search"
-            placeholder="Szukaj w sesji…"
+            className="ch-input"
+            placeholder="Search in session"
             value={query}
             onChange={(e) => {
               setQuery(e.target.value);
               setHitIndex(0);
             }}
-            aria-label="Szukaj w sesji"
+            aria-label="Search in session"
           />
           {query && (
-            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-neutral-500">
+            <span className="hits">
               {hits.length === 0 ? '0' : `${hitIndex + 1}/${hits.length}`}
             </span>
           )}
         </div>
-        <Button
-          size="sm"
-          variant="ghost"
+        <CHButton
+          variant="outline"
+          size="icon"
           onClick={() => goToHit(hitIndex - 1)}
           disabled={hits.length === 0}
-          title="Poprzednie trafienie"
+          title="Previous match"
         >
           ↑
-        </Button>
-        <Button
-          size="sm"
-          variant="ghost"
+        </CHButton>
+        <CHButton
+          variant="outline"
+          size="icon"
           onClick={() => goToHit(hitIndex + 1)}
           disabled={hits.length === 0}
           title="Next match"
         >
           ↓
-        </Button>
-        <Button
-          size="sm"
-          variant={onlyHits ? 'secondary' : 'ghost'}
+        </CHButton>
+        <CHButton
+          variant={onlyHits ? 'on' : 'outline'}
           onClick={() => setOnlyHits((v) => !v)}
           disabled={!query}
-          title="Show only messages with a match"
+          title="Show only matches"
+          size="sm"
         >
-          tylko ▾
-        </Button>
+          only hits
+        </CHButton>
+        <div style={{ flex: 1 }} />
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -238,28 +236,20 @@ export function Viewer() {
           }}
           className="flex items-center gap-1"
         >
-          <Input
+          <input
             type="text"
+            className="ch-input sm plain"
             value={jumpQuery}
             onChange={(e) => setJumpQuery(e.target.value)}
-            placeholder="np. 42 · 5m · 1h30m"
-            className="h-8 w-36 text-xs"
-            aria-label="Skocz do zdarzenia"
+            placeholder="jump · 42 · 5m · 1h30m"
+            style={{ width: 170 }}
+            aria-label="Jump to event"
             title="Event number (42) or offset from the session start (5m, 1h30m)"
           />
-          <Button
-            size="sm"
-            variant="ghost"
-            type="submit"
-            disabled={events.length === 0 || jumpQuery.trim() === ''}
-            title="Skocz"
-          >
-            →
-          </Button>
         </form>
-        <Button
+        <CHButton
+          variant={follow ? 'on' : 'outline'}
           size="sm"
-          variant={follow ? 'secondary' : 'outline'}
           onClick={() => setFollow((f) => !f)}
           aria-pressed={follow}
           disabled={replayState.active}
@@ -269,63 +259,69 @@ export function Viewer() {
               : 'Auto-scroll to the newest message'
           }
         >
-          {follow ? 'Follow: on' : 'Follow: off'}
-        </Button>
-        <Button
+          <span
+            style={{
+              width: 6,
+              height: 6,
+              borderRadius: '50%',
+              background: follow ? 'var(--gold-400)' : 'var(--fg-4)',
+              boxShadow: follow ? '0 0 6px var(--gold-glow)' : 'none',
+            }}
+          />
+          Follow {follow ? 'on' : 'off'}
+        </CHButton>
+        <CHButton
+          variant={replayState.active ? 'on' : 'outline'}
           size="sm"
-          variant={replayState.active ? 'secondary' : 'outline'}
           onClick={() => (replayState.active ? replayControls.exit() : replayControls.start())}
           disabled={events.length === 0}
-          title="Odtwarzanie sesji event po evencie"
+          title="Replay the session event by event"
         >
-          {replayState.active ? 'Replay: on' : 'Replay'}
-        </Button>
+          {replayState.active ? '◼ exit replay' : '▶ replay'}
+        </CHButton>
       </div>
 
       {replayState.active && <ReplayBar state={replayState} controls={replayControls} />}
 
-      <div className="flex flex-wrap items-center gap-2 border-b border-neutral-800 bg-neutral-950 px-4 py-2 text-[11px]">
+      <div className="viewer-filters">
         {ALL_CATEGORIES.map((c) => {
-          const active = !hidden.has(c);
+          const on = !hidden.has(c);
           return (
             <button
               key={c}
               type="button"
               onClick={() => toggleCategory(c)}
-              className={cn(
-                'inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 transition-colors',
-                active
-                  ? 'border-neutral-600 bg-neutral-800 text-neutral-100'
-                  : 'border-neutral-800 bg-neutral-950 text-neutral-500 hover:text-neutral-300',
-              )}
-              aria-pressed={active}
+              className={cn('chip', on && 'on')}
+              aria-pressed={on}
             >
               <span>{CATEGORY_LABEL[c]}</span>
-              <span
-                className={cn(
-                  'rounded-full px-1 font-mono text-[10px]',
-                  active ? 'bg-neutral-700 text-neutral-200' : 'bg-neutral-800 text-neutral-500',
-                )}
-              >
-                {categoryCounts[c]}
-              </span>
+              <span className="count">{categoryCounts[c]}</span>
             </button>
           );
         })}
-        <span className="ml-auto text-[10px] text-neutral-500">
-          {visibleEvents.length}/{events.length} · {(bytes / 1024).toFixed(1)} KB{' '}
+        <div className="spacer" />
+        <span className="stat">
+          {visibleEvents.length}/{events.length} events · {(bytes / 1024).toFixed(1)} KB{' '}
           {loading && !done && '…'}
         </span>
       </div>
 
       {error && (
-        <div className="border-b border-red-900 bg-red-900/20 px-4 py-2 text-sm text-red-300">
+        <div
+          style={{
+            borderBottom: '1px solid var(--red-bg)',
+            background: 'var(--red-bg)',
+            padding: '8px 16px',
+            fontSize: 12,
+            color: 'var(--red)',
+          }}
+        >
           Error: {error}
         </div>
       )}
 
-      <div className="flex min-h-0 flex-1">
-        <div className="min-h-0 min-w-0 flex-1">
+      <div className="viewer-body">
+        <div className="viewer-list">
           {events.length === 0 && loading ? (
             <div className="flex flex-col gap-3 p-4">
               {Array.from({ length: 6 }).map((_, i) => (
@@ -333,24 +329,25 @@ export function Viewer() {
               ))}
             </div>
           ) : visibleEvents.length === 0 ? (
-            <div className="flex h-full items-center justify-center p-8 text-sm text-neutral-500">
+            <div
+              className="flex h-full items-center justify-center p-8 text-sm"
+              style={{ color: 'var(--fg-3)' }}
+            >
               No event matches the current filters.
             </div>
           ) : (
             <Virtuoso
               ref={virtuosoRef}
-              className={cn('h-full')}
+              style={{ height: '100%' }}
               data={visibleEvents}
               followOutput={follow ? 'smooth' : false}
               atBottomThreshold={120}
               rangeChanged={({ startIndex, endIndex }) =>
                 setVisibleRange({ start: startIndex, end: endIndex })
               }
-              itemContent={(index, pair) => (
-                <div className="px-4 py-1.5">
-                  {renderEvent(pair.ev, pair.origIndex, toolUseRegistry, parentToolUseRegistry)}
-                </div>
-              )}
+              itemContent={(_index, pair) =>
+                renderEvent(pair.ev, pair.origIndex, toolUseRegistry, parentToolUseRegistry)
+              }
             />
           )}
         </div>

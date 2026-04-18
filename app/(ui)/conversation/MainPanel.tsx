@@ -3,12 +3,23 @@
 import { useUiStore } from '@/stores/ui-slice';
 import { useProjects } from '@/hooks/use-projects';
 import { useTerminalStore } from '@/stores/terminal-slice';
-import { Button } from '@/components/ui/button';
+import { CHButton } from '@/components/ui/ch-button';
+import { Kbd } from '@/components/ui/kbd';
+import {
+  IconSearch,
+  IconTerm,
+  IconEdit,
+  IconHistory,
+  IconHelp,
+  IconSettings,
+} from '@/components/ui/icons';
 import { Viewer } from './Viewer';
 import { TabBar } from '@/app/(ui)/terminal/TabBar';
 import { TabManager } from '@/app/(ui)/terminal/TabManager';
 import { QuickActions } from '@/app/(ui)/terminal/QuickActions';
 import { MarkdownEditor } from '@/app/(ui)/editor/MarkdownEditor';
+import { paletteOpenEvent, helpOpenEvent, settingsOpenEvent } from '@/lib/ui/overlay-events';
+import { cn } from '@/lib/utils';
 
 type Mode = 'viewer' | 'terminal' | 'editor';
 
@@ -42,49 +53,89 @@ export function MainPanel() {
       ? 'terminal'
       : 'viewer';
 
-  const headerTitle = {
-    viewer: 'History',
-    terminal: `Terminal · ${tabs.length}/16`,
-    editor: 'CLAUDE.md',
-  }[mode];
+  const setMode = (next: Mode) => {
+    if (next === mode) return;
+    if (next === 'viewer') {
+      closeEditor();
+      if (terminalOpen) closeTerminal();
+      return;
+    }
+    if (next === 'terminal') {
+      closeEditor();
+      if (tabs.length === 0) newShellTab();
+      else openTerminal(tabs[0]?.cwd ?? '/');
+      return;
+    }
+    if (next === 'editor') {
+      if (terminalOpen) closeTerminal();
+      openEditor();
+    }
+  };
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <header className="flex items-center justify-between border-b border-neutral-800 px-4 py-3">
-        <h2 className="text-sm font-medium">{headerTitle}</h2>
-        <div className="flex items-center gap-2">
-          <Button
-            size="sm"
-            variant={mode === 'editor' ? 'secondary' : 'outline'}
-            onClick={() => (mode === 'editor' ? closeEditor() : openEditor())}
+      <header className="main-head">
+        <div className="seg" role="tablist">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mode === 'viewer'}
+            className={cn(mode === 'viewer' && 'on')}
+            onClick={() => setMode('viewer')}
           >
-            CLAUDE.md
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={!activeProject?.resolvedCwd}
-            onClick={newShellTab}
+            <IconHistory /> History
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mode === 'terminal'}
+            className={cn(mode === 'terminal' && 'on')}
+            onClick={() => setMode('terminal')}
+            disabled={!activeProject?.resolvedCwd && tabs.length === 0}
             title={
-              activeProject?.resolvedCwd
-                ? `New shell in ${activeProject.resolvedCwd}`
-                : 'Pick a project to open a terminal'
+              !activeProject?.resolvedCwd && tabs.length === 0
+                ? 'Pick a project to open a terminal'
+                : 'Switch to terminal'
             }
           >
-            + shell
-          </Button>
-          {mode === 'terminal' ? (
-            <Button size="sm" variant="ghost" onClick={closeTerminal}>
-              Show history
-            </Button>
-          ) : mode === 'editor' ? null : (
-            tabs.length > 0 && (
-              <Button size="sm" variant="ghost" onClick={() => openTerminal(tabs[0]?.cwd ?? '/')}>
-                Show terminal ({tabs.length})
-              </Button>
-            )
-          )}
+            <IconTerm /> Terminal
+            <span className="pill">{tabs.length}/16</span>
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mode === 'editor'}
+            className={cn(mode === 'editor' && 'on')}
+            onClick={() => setMode('editor')}
+          >
+            <IconEdit /> CLAUDE.md
+          </button>
         </div>
+        <div style={{ flex: 1 }} />
+        <CHButton
+          variant="outline"
+          size="sm"
+          onClick={() => window.dispatchEvent(new Event(paletteOpenEvent))}
+          title="Command palette"
+        >
+          <IconSearch /> jump to anything <Kbd>⌘K</Kbd>
+        </CHButton>
+        <CHButton
+          size="sm"
+          variant="outline"
+          onClick={() => window.dispatchEvent(new Event(helpOpenEvent))}
+          title="Keyboard shortcuts"
+        >
+          <IconHelp />
+        </CHButton>
+        <CHButton
+          size="sm"
+          variant="outline"
+          onClick={() => window.dispatchEvent(new Event(settingsOpenEvent))}
+          title="Settings"
+        >
+          <IconSettings />
+        </CHButton>
       </header>
       {mode === 'terminal' && (
         <>

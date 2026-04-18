@@ -39,14 +39,14 @@ Security and platform constraints that shape the design space:
 
 ### 3.1 Token layer
 
-| Layer       | Where                                        | What it does                                                                                                                                      |
-| ----------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Tailwind v4 | `postcss.config.mjs` + `app/globals.css`     | Uses the v4 `@theme` directive inside `globals.css`; no separate `tailwind.config.js`                                                             |
-| CSS vars    | `app/globals.css`                            | `--color-background: #0a0a0a`, `--color-foreground: #fafafa`, plus vars populated at runtime by SettingsApplier                                    |
-| Settings    | `lib/settings/types.ts`                      | Enumerations for `viewerFontSize`, `terminalFontSize`, `viewerDensity`, `theme`, `timestampFormat`, `hiddenCategories`, `terminalQuickActions`    |
-| Applier     | `components/SettingsApplier.tsx`             | Writes `--ui-viewer-font-size`, `--ui-terminal-font-size`, `--ui-viewer-pad`, `--ui-viewer-line-height`, and `data-theme` on `<html>`              |
-| Providers   | `components/providers.tsx`                   | Wraps QueryClientProvider, TooltipProvider (delay 200 ms), SettingsApplier, WatcherSubscriber, HelpOverlay, CommandPalette, Toaster (sonner)     |
-| Brand asset | `screens/banner.webp`                        | Amber gold `#d4a72c` on pure black `#080808`, monospace ANSI Shadow wordmark — this is the source of truth for the accent colour                 |
+| Layer       | Where                                    | What it does                                                                                                                                   |
+| ----------- | ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| Tailwind v4 | `postcss.config.mjs` + `app/globals.css` | Uses the v4 `@theme` directive inside `globals.css`; no separate `tailwind.config.js`                                                          |
+| CSS vars    | `app/globals.css`                        | `--color-background: #0a0a0a`, `--color-foreground: #fafafa`, plus vars populated at runtime by SettingsApplier                                |
+| Settings    | `lib/settings/types.ts`                  | Enumerations for `viewerFontSize`, `terminalFontSize`, `viewerDensity`, `theme`, `timestampFormat`, `hiddenCategories`, `terminalQuickActions` |
+| Applier     | `components/SettingsApplier.tsx`         | Writes `--ui-viewer-font-size`, `--ui-terminal-font-size`, `--ui-viewer-pad`, `--ui-viewer-line-height`, and `data-theme` on `<html>`          |
+| Providers   | `components/providers.tsx`               | Wraps QueryClientProvider, TooltipProvider (delay 200 ms), SettingsApplier, WatcherSubscriber, HelpOverlay, CommandPalette, Toaster (sonner)   |
+| Brand asset | `screens/banner.webp`                    | Amber gold `#d4a72c` on pure black `#080808`, monospace ANSI Shadow wordmark — this is the source of truth for the accent colour               |
 
 ### 3.2 Color palette in use (today)
 
@@ -99,54 +99,54 @@ File paths are relative to repo root. Line refs on the important ones.
 
 ### 4.1 Design-system primitives — `components/ui/`
 
-| File                | Exposes                                                                          |
-| ------------------- | -------------------------------------------------------------------------------- |
-| `button.tsx`        | `Button` with CVA variants: `default / ghost / outline / secondary`, sizes `default / sm / icon` |
-| `input.tsx`         | `Input` — single variant, `h-9 border-neutral-800 bg-neutral-900`                |
-| `dialog.tsx`        | `Dialog*` Radix wrappers including `DialogContent` `hideClose` prop              |
-| `command.tsx`       | `Command*` cmdk wrappers — palette primitives                                    |
-| `select.tsx`        | Styled native `<select>`, `h-7 text-xs`                                          |
-| `popover.tsx`       | `Popover*` Radix wrappers                                                        |
-| `tooltip.tsx`       | `TooltipProvider` + `Tooltip*` wrappers                                          |
-| `scroll-area.tsx`   | Radix ScrollArea — thumb `bg-neutral-700`                                        |
-| `skeleton.tsx`      | Single shimmer, `bg-neutral-800 animate-pulse`                                   |
+| File              | Exposes                                                                                          |
+| ----------------- | ------------------------------------------------------------------------------------------------ |
+| `button.tsx`      | `Button` with CVA variants: `default / ghost / outline / secondary`, sizes `default / sm / icon` |
+| `input.tsx`       | `Input` — single variant, `h-9 border-neutral-800 bg-neutral-900`                                |
+| `dialog.tsx`      | `Dialog*` Radix wrappers including `DialogContent` `hideClose` prop                              |
+| `command.tsx`     | `Command*` cmdk wrappers — palette primitives                                                    |
+| `select.tsx`      | Styled native `<select>`, `h-7 text-xs`                                                          |
+| `popover.tsx`     | `Popover*` Radix wrappers                                                                        |
+| `tooltip.tsx`     | `TooltipProvider` + `Tooltip*` wrappers                                                          |
+| `scroll-area.tsx` | Radix ScrollArea — thumb `bg-neutral-700`                                                        |
+| `skeleton.tsx`    | Single shimmer, `bg-neutral-800 animate-pulse`                                                   |
 
 ### 4.2 Global shell — `app/` and `components/`
 
-| File                                 | Role                                                                                           |
-| ------------------------------------ | ---------------------------------------------------------------------------------------------- |
-| `app/layout.tsx`                     | Root HTML (`lang="en" className="dark"`), body classes, provider mount, nonce reader           |
-| `app/page.tsx`                       | Mounts `<ResizableColumns sidebar={…} sessions={…} viewer={<MainPanel />}>` — **THE** main page |
-| `components/providers.tsx`           | All-in providers wrapper                                                                       |
-| `components/SettingsApplier.tsx`     | Applies settings to CSS vars + `data-theme`                                                    |
-| `components/SettingsDialog.tsx`      | Settings modal — rows for every setting (fonts, density, theme, timestamp, hidden categories, model pricing, terminal quick actions) |
-| `components/CommandPalette.tsx`      | Cmd+K palette — recent + all projects, "new shell", "open CLAUDE.md", "close tab"              |
-| `components/HelpOverlay.tsx`         | `?` overlay listing keyboard shortcuts                                                         |
-| `components/layout/ResizableColumns.tsx` | Three-pane resize layout with keyboard-accessible splitters                                |
+| File                                     | Role                                                                                                                                 |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `app/layout.tsx`                         | Root HTML (`lang="en" className="dark"`), body classes, provider mount, nonce reader                                                 |
+| `app/page.tsx`                           | Mounts `<ResizableColumns sidebar={…} sessions={…} viewer={<MainPanel />}>` — **THE** main page                                      |
+| `components/providers.tsx`               | All-in providers wrapper                                                                                                             |
+| `components/SettingsApplier.tsx`         | Applies settings to CSS vars + `data-theme`                                                                                          |
+| `components/SettingsDialog.tsx`          | Settings modal — rows for every setting (fonts, density, theme, timestamp, hidden categories, model pricing, terminal quick actions) |
+| `components/CommandPalette.tsx`          | Cmd+K palette — recent + all projects, "new shell", "open CLAUDE.md", "close tab"                                                    |
+| `components/HelpOverlay.tsx`             | `?` overlay listing keyboard shortcuts                                                                                               |
+| `components/layout/ResizableColumns.tsx` | Three-pane resize layout with keyboard-accessible splitters                                                                          |
 
 ### 4.3 Sidebar (left pane) — `app/(ui)/sidebar/`
 
-| File                                 | Role                                                                                           |
-| ------------------------------------ | ---------------------------------------------------------------------------------------------- |
-| `app/(ui)/sidebar/Search.tsx`        | Debounced (150 ms) project-filter input                                                        |
-| `app/(ui)/sidebar/ProjectList.tsx`   | Projects list with sort dropdown (activity/name/sessions), grouping toggle (flat/prefix), favorites pin, alias editing inline |
+| File                               | Role                                                                                                                          |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `app/(ui)/sidebar/Search.tsx`      | Debounced (150 ms) project-filter input                                                                                       |
+| `app/(ui)/sidebar/ProjectList.tsx` | Projects list with sort dropdown (activity/name/sessions), grouping toggle (flat/prefix), favorites pin, alias editing inline |
 
 ### 4.4 Session explorer (middle pane) — `app/(ui)/session-explorer/`
 
-| File                                      | Role                                                                 |
-| ----------------------------------------- | -------------------------------------------------------------------- |
-| `app/(ui)/session-explorer/ProjectHeader.tsx` | Shows selected project + alias edit-in-place                     |
+| File                                          | Role                                                                    |
+| --------------------------------------------- | ----------------------------------------------------------------------- |
+| `app/(ui)/session-explorer/ProjectHeader.tsx` | Shows selected project + alias edit-in-place                            |
 | `app/(ui)/session-explorer/SessionList.tsx`   | List of sessions with preview, size, msg count, mtime, per-session cost |
 
 ### 4.5 Conversation viewer (right pane) — `app/(ui)/conversation/`
 
-| File                                 | Role                                                                                           |
-| ------------------------------------ | ---------------------------------------------------------------------------------------------- |
-| `app/(ui)/conversation/MainPanel.tsx`| Mode switcher — viewer / terminal / editor. Owns the header with mode buttons                  |
-| `app/(ui)/conversation/Viewer.tsx`   | Virtualised event list (react-virtuoso). Hosts search, filters, replay, jump-to-event input    |
-| `app/(ui)/conversation/StatsBar.tsx` | Collapsible stats row above viewer: duration, token totals, top tool counts                    |
-| `app/(ui)/conversation/Outline.tsx`  | Right-side minimap of events, marker height = log(bytes), color per category                   |
-| `app/(ui)/conversation/ReplayBar.tsx`| Purple-themed replay controls (play/pause, speed 1x/2x/5x/timestamps, scrubber, Exit)          |
+| File                                  | Role                                                                                        |
+| ------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `app/(ui)/conversation/MainPanel.tsx` | Mode switcher — viewer / terminal / editor. Owns the header with mode buttons               |
+| `app/(ui)/conversation/Viewer.tsx`    | Virtualised event list (react-virtuoso). Hosts search, filters, replay, jump-to-event input |
+| `app/(ui)/conversation/StatsBar.tsx`  | Collapsible stats row above viewer: duration, token totals, top tool counts                 |
+| `app/(ui)/conversation/Outline.tsx`   | Right-side minimap of events, marker height = log(bytes), color per category                |
+| `app/(ui)/conversation/ReplayBar.tsx` | Purple-themed replay controls (play/pause, speed 1x/2x/5x/timestamps, scrubber, Exit)       |
 
 ### 4.6 Per-event renderers — `components/conversation/`
 
@@ -159,29 +159,29 @@ Single file, per-type components rendered by `renderEvent`:
 
 ### 4.7 Terminal — `app/(ui)/terminal/`
 
-| File                                 | Role                                                                                           |
-| ------------------------------------ | ---------------------------------------------------------------------------------------------- |
-| `app/(ui)/terminal/TabBar.tsx`       | Tab strip, middle-click to close, "+ new" button                                               |
-| `app/(ui)/terminal/TabManager.tsx`   | Renders every terminal (inactive ones offscreen so xterm state survives)                       |
+| File                                 | Role                                                                                            |
+| ------------------------------------ | ----------------------------------------------------------------------------------------------- |
+| `app/(ui)/terminal/TabBar.tsx`       | Tab strip, middle-click to close, "+ new" button                                                |
+| `app/(ui)/terminal/TabManager.tsx`   | Renders every terminal (inactive ones offscreen so xterm state survives)                        |
 | `app/(ui)/terminal/Terminal.tsx`     | xterm wrapper — header shows cwd + git branch badge + status badge + Clear/Save/Restart buttons |
-| `app/(ui)/terminal/QuickActions.tsx` | Row of predefined shell commands above the active tab (from settings)                          |
+| `app/(ui)/terminal/QuickActions.tsx` | Row of predefined shell commands above the active tab (from settings)                           |
 
 ### 4.8 Markdown editor — `app/(ui)/editor/`
 
-| File                                        | Role                                                                                    |
-| ------------------------------------------- | --------------------------------------------------------------------------------------- |
-| `app/(ui)/editor/MarkdownEditor.tsx`        | CodeMirror 6 editor for `CLAUDE.md` — Global/Project toggle, Recent dropdown, Preview split, Diff button → Dialog, Save (Ctrl+S) |
+| File                                 | Role                                                                                                                             |
+| ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
+| `app/(ui)/editor/MarkdownEditor.tsx` | CodeMirror 6 editor for `CLAUDE.md` — Global/Project toggle, Recent dropdown, Preview split, Diff button → Dialog, Save (Ctrl+S) |
 
 ### 4.9 State modules that drive UI variation
 
-| File                         | Role                                                                                          |
-| ---------------------------- | --------------------------------------------------------------------------------------------- |
-| `stores/ui-slice.ts`         | Zustand — `selectedProjectSlug`, `selectedSessionId`, `search`, `terminalOpen`, `editorOpen`, `pendingEventIndex`, `sortMode`, `projectGrouping` |
-| `stores/terminal-slice.ts`   | Terminal tabs, `activeTabId`, writer registry used by QuickActions                            |
-| `lib/ui/layout-storage.ts`   | localStorage key `codehelm:layout` — sidebar/sessions widths, sortMode, editorPreview, projectGrouping |
-| `lib/ui/recent-files.ts`     | localStorage key `codehelm:recent-md` — LRU of 10 recent CLAUDE.md targets                    |
-| `hooks/use-settings.ts`      | TanStack Query hook over `/api/settings`                                                      |
-| `lib/ui/toast.ts`            | `toastSuccess/Error/Info/Warning` wrappers over sonner                                        |
+| File                       | Role                                                                                                                                             |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `stores/ui-slice.ts`       | Zustand — `selectedProjectSlug`, `selectedSessionId`, `search`, `terminalOpen`, `editorOpen`, `pendingEventIndex`, `sortMode`, `projectGrouping` |
+| `stores/terminal-slice.ts` | Terminal tabs, `activeTabId`, writer registry used by QuickActions                                                                               |
+| `lib/ui/layout-storage.ts` | localStorage key `codehelm:layout` — sidebar/sessions widths, sortMode, editorPreview, projectGrouping                                           |
+| `lib/ui/recent-files.ts`   | localStorage key `codehelm:recent-md` — LRU of 10 recent CLAUDE.md targets                                                                       |
+| `hooks/use-settings.ts`    | TanStack Query hook over `/api/settings`                                                                                                         |
+| `lib/ui/toast.ts`          | `toastSuccess/Error/Info/Warning` wrappers over sonner                                                                                           |
 
 ---
 
@@ -210,6 +210,7 @@ The app is a single page. Everything below happens inside the `ResizableColumns`
 Layout: `<StatsBar>` on top, toolbar (search + category chips + Follow + Replay + Jump-to-event), virtualised list, `<Outline>` minimap on right.
 
 Key states to design for:
+
 - Empty (no session selected)
 - Loading (skeletons)
 - Long session (2000+ events) — virtualisation renders a sliding window
@@ -218,6 +219,7 @@ Key states to design for:
 - Category filter chips — can turn user/assistant/tools/system on/off live
 
 Each event in the list can be one of 9 types (see 4.6). The most visually distinct ones:
+
 - **User** — blue role label + `<pre>` text
 - **Assistant** — emerald role label + rendered Markdown + optional code blocks (Shiki highlighted)
 - **Tool use** — amber collapsed card `name: {truncated input}`, expands to JSON
@@ -228,6 +230,7 @@ Each event in the list can be one of 9 types (see 4.6). The most visually distin
 Layout when `tabs.length > 0`: `<TabBar>` + `<QuickActions>` + `<TabManager>`. No Outline.
 
 Chrome to design:
+
 - Tab chip (active = `border-neutral-600 bg-neutral-800`, inactive = `border-neutral-800 bg-neutral-950`)
 - Quick-actions row — between 0 and 12 chips with command labels
 - Terminal header (inside each Terminal instance) — cwd path, git branch badge (`main●` dirty or `main` clean), status chip (connecting/ready/closed/error), Clear / Save / Restart buttons
@@ -237,6 +240,7 @@ Chrome to design:
 Layout: header toolbar + CodeMirror (optional split with Markdown preview on right).
 
 Chrome to design:
+
 - Target switcher (Per-project | Global)
 - Recent files dropdown (Popover, max 10)
 - Preview / Diff / Save buttons
@@ -255,19 +259,19 @@ Chrome to design:
 
 Preserve these and make sure the redesign leaves room for their chrome:
 
-| Trigger       | Action                                                                                           |
-| ------------- | ------------------------------------------------------------------------------------------------ |
-| `?`           | Toggle HelpOverlay (except inside text inputs)                                                   |
-| `Ctrl/⌘ + K`  | Toggle CommandPalette                                                                            |
-| `Ctrl/⌘ + S`  | Save CLAUDE.md                                                                                   |
-| `Ctrl/⌘ + T`  | New shell tab                                                                                    |
-| `/`           | Focus sidebar search                                                                             |
-| `g g`         | Scroll viewer to top                                                                             |
-| `G`           | Scroll viewer to bottom                                                                          |
-| `Space`       | Play/pause replay (when replay mode active and focus not in an input)                            |
-| Arrow keys    | Resize a splitter when focused (16 px steps)                                                     |
-| Middle-click  | Close a terminal tab                                                                             |
-| Outside click + `Esc` | Close any Radix modal                                                                   |
+| Trigger               | Action                                                                |
+| --------------------- | --------------------------------------------------------------------- |
+| `?`                   | Toggle HelpOverlay (except inside text inputs)                        |
+| `Ctrl/⌘ + K`          | Toggle CommandPalette                                                 |
+| `Ctrl/⌘ + S`          | Save CLAUDE.md                                                        |
+| `Ctrl/⌘ + T`          | New shell tab                                                         |
+| `/`                   | Focus sidebar search                                                  |
+| `g g`                 | Scroll viewer to top                                                  |
+| `G`                   | Scroll viewer to bottom                                               |
+| `Space`               | Play/pause replay (when replay mode active and focus not in an input) |
+| Arrow keys            | Resize a splitter when focused (16 px steps)                          |
+| Middle-click          | Close a terminal tab                                                  |
+| Outside click + `Esc` | Close any Radix modal                                                 |
 
 ---
 

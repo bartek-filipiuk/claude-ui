@@ -28,7 +28,7 @@ describe('renderEvent', () => {
     });
     renderEv(renderEvent(ev, 0));
     expect(screen.getByText('Hello')).toBeDefined();
-    expect(screen.getByText('user')).toBeDefined();
+    expect(screen.getByText('USER')).toBeDefined();
   });
 
   it('renders assistant (markdown)', () => {
