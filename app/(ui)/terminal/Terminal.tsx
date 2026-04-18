@@ -21,12 +21,12 @@ export interface TerminalProps {
    * store keyed by this id. External consumers (quick actions) can then
    * `sendToActive` without prop-drilling.
    */
-  tabId?: string;
+  paneId?: string;
 }
 
 const RESIZE_DEBOUNCE_MS = 100;
 
-export function Terminal({ cwd, shell, args, initCommand, tabId }: TerminalProps) {
+export function Terminal({ cwd, shell, args, initCommand, paneId }: TerminalProps) {
   const registerWriter = useTerminalStore((s) => s.registerWriter);
   const unregisterWriter = useTerminalStore((s) => s.unregisterWriter);
   const [gitStatus, setGitStatus] = useState<{ branch: string | null; dirty: boolean } | null>(
@@ -78,10 +78,10 @@ export function Terminal({ cwd, shell, args, initCommand, tabId }: TerminalProps
 
   // Publish our write function to the store so quick actions can reach us.
   useEffect(() => {
-    if (!tabId) return;
-    registerWriter(tabId, write);
-    return () => unregisterWriter(tabId);
-  }, [tabId, write, registerWriter, unregisterWriter]);
+    if (!paneId) return;
+    registerWriter(paneId, write);
+    return () => unregisterWriter(paneId);
+  }, [paneId, write, registerWriter, unregisterWriter]);
 
   // Mount xterm exactly once.
   useEffect(() => {
