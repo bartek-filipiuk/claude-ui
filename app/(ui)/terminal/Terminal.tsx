@@ -88,11 +88,13 @@ export function Terminal({ cwd, shell, args, initCommand, paneId }: TerminalProp
     if (!hostRef.current || termRef.current) return;
     let disposed = false;
     (async () => {
-      const [{ Terminal: XTerm }, { FitAddon }, { WebLinksAddon }] = await Promise.all([
-        import('@xterm/xterm'),
-        import('@xterm/addon-fit'),
-        import('@xterm/addon-web-links'),
-      ]);
+      const [{ Terminal: XTerm }, { FitAddon }, { WebLinksAddon }, { WebglAddon }] =
+        await Promise.all([
+          import('@xterm/xterm'),
+          import('@xterm/addon-fit'),
+          import('@xterm/addon-web-links'),
+          import('@xterm/addon-webgl'),
+        ]);
       if (disposed) return;
       const term = new XTerm({
         convertEol: false,
@@ -112,6 +114,14 @@ export function Terminal({ cwd, shell, args, initCommand, paneId }: TerminalProp
       term.loadAddon(links);
       if (!hostRef.current) return;
       term.open(hostRef.current);
+      // WebGL renderer for throughput; xterm auto-falls-back to DOM on context loss.
+      try {
+        const webgl = new WebglAddon();
+        webgl.onContextLoss(() => webgl.dispose());
+        term.loadAddon(webgl);
+      } catch {
+        // WebGL2 unavailable or blocked — stay on default DOM renderer.
+      }
       try {
         fit.fit();
       } catch {
@@ -161,6 +171,22 @@ export function Terminal({ cwd, shell, args, initCommand, paneId }: TerminalProp
     });
     obs.observe(hostRef.current);
     return () => obs.disconnect();
+  }, []);
+
+  // Refit immediately (in rAF) when a PaneGrid splitter release fires.
+  // ResizeObserver catches this too, but aligning to a frame kills tearing.
+  useEffect(() => {
+    const onEnd = () => {
+      requestAnimationFrame(() => {
+        try {
+          fitRef.current?.fit();
+        } catch {
+          /* ignore */
+        }
+      });
+    };
+    window.addEventListener('codehelm:pane-resize-end', onEnd);
+    return () => window.removeEventListener('codehelm:pane-resize-end', onEnd);
   }, []);
 
   // React to font-size changes from settings without re-mounting xterm.
