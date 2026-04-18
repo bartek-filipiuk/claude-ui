@@ -2,6 +2,7 @@ import { ptyManager } from '@/lib/pty/manager';
 import { persistentTabsRegistry } from '@/lib/pty/persistent-tabs-registry';
 import { audit } from '@/lib/server/audit';
 import { logger } from '@/lib/server/logger';
+import { getSingleton } from '@/lib/server/singleton';
 import * as jobsStore from './jobs-store';
 import * as runsStore from './runs-store';
 import { tabLockManager } from './tab-lock';
@@ -139,4 +140,4 @@ function wrapBracketedPaste(prompt: string): string {
   return `${START}${prompt}${END}\r`;
 }
 
-export const cronExecutor = new Executor();
+export const cronExecutor = getSingleton('cronExecutor', () => new Executor());

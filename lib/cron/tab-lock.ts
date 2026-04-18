@@ -1,3 +1,5 @@
+import { getSingleton } from '@/lib/server/singleton';
+
 const DEFAULT_TTL_MS = 60_000;
 
 class TabLockManager {
@@ -26,4 +28,4 @@ class TabLockManager {
   }
 }
 
-export const tabLockManager = new TabLockManager();
+export const tabLockManager = getSingleton('tabLockManager', () => new TabLockManager());

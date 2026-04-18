@@ -4,6 +4,7 @@ import { spawnPty, type SpawnOptions } from './spawn';
 import { auditPty } from './audit';
 import { LIMITS } from '@/lib/server/config';
 import { logger } from '@/lib/server/logger';
+import { getSingleton } from '@/lib/server/singleton';
 import { isReadyHybrid } from './ready-check';
 
 export type DataListener = (chunk: string) => void;
@@ -275,4 +276,4 @@ class PtyManager {
   }
 }
 
-export const ptyManager = new PtyManager();
+export const ptyManager = getSingleton('ptyManager', () => new PtyManager());

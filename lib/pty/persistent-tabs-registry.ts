@@ -1,6 +1,7 @@
 import { ptyManager } from './manager';
 import type { PersistentTab } from './persistent-tabs-store';
 import { logger } from '@/lib/server/logger';
+import { getSingleton } from '@/lib/server/singleton';
 
 interface Entry {
   tab: PersistentTab;
@@ -71,5 +72,8 @@ class PersistentTabsRegistry {
   }
 }
 
-export const persistentTabsRegistry = new PersistentTabsRegistry();
+export const persistentTabsRegistry = getSingleton(
+  'persistentTabsRegistry',
+  () => new PersistentTabsRegistry(),
+);
 export type { Entry as PersistentTabEntry };

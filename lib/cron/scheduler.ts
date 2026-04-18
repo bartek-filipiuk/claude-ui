@@ -1,5 +1,6 @@
 import { Cron } from 'croner';
 import { logger } from '@/lib/server/logger';
+import { getSingleton } from '@/lib/server/singleton';
 import * as jobsStore from './jobs-store';
 import * as runsStore from './runs-store';
 import { cronExecutor } from './executor';
@@ -112,4 +113,4 @@ class CronScheduler {
   }
 }
 
-export const cronScheduler = new CronScheduler();
+export const cronScheduler = getSingleton('cronScheduler', () => new CronScheduler());
