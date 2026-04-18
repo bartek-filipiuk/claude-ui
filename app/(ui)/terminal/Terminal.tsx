@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Button } from '@/components/ui/button';
+import { CHButton } from '@/components/ui/ch-button';
+import { Badge } from '@/components/ui/badge';
 import { usePty, type PtyStatus } from '@/hooks/use-pty';
 import { useSettings } from '@/hooks/use-settings';
 import { useTerminalStore } from '@/stores/terminal-slice';
@@ -196,37 +197,47 @@ export function Terminal({ cwd, shell, args, initCommand, tabId }: TerminalProps
     toastInfo('Terminal buffer saved', { description: a.download });
   };
 
+  const segments = cwd.split('/').filter(Boolean);
+  const leaf = segments[segments.length - 1] ?? cwd;
+  const prefix = segments.slice(0, -1);
+
   return (
-    <div className="flex h-full min-h-0 flex-col bg-neutral-950">
-      <div className="flex items-center justify-between border-b border-neutral-800 px-3 py-1.5 text-xs text-neutral-500">
-        <span className="flex min-w-0 items-center gap-2">
-          <span className="truncate font-mono">{cwd}</span>
-          {gitStatus?.branch && (
-            <button
-              type="button"
-              onClick={() => void fetchGitStatus()}
-              className="inline-flex items-center gap-1 rounded border border-neutral-700 bg-neutral-900 px-1.5 py-0.5 font-mono text-[10px] text-neutral-300 hover:border-neutral-600 hover:text-neutral-100"
-              title={gitStatus.dirty ? `${gitStatus.branch} (dirty)` : gitStatus.branch}
-            >
-              <span>{gitStatus.branch}</span>
-              {gitStatus.dirty && <span className="text-amber-400">●</span>}
-            </button>
-          )}
+    <div className="term-wrap">
+      <div className="term-head">
+        <span className="cwd">
+          {cwd.startsWith('/') ? <span className="sep">/</span> : <span className="home">~</span>}
+          {prefix.map((seg, i) => (
+            <span key={`${seg}-${i}`}>
+              {seg}
+              <span className="sep">/</span>
+            </span>
+          ))}
+          <span className="leaf">{leaf}</span>
         </span>
-        <span className="flex items-center gap-2">
-          <StatusBadge status={status} />
-          <Button size="sm" variant="ghost" onClick={handleClear} title="Clear buffer">
-            Clear
-          </Button>
-          <Button size="sm" variant="ghost" onClick={handleSave} title="Download buffer as .txt">
-            Save
-          </Button>
-          <Button
+        {gitStatus?.branch && (
+          <button
+            type="button"
+            className="gitbadge"
+            onClick={() => void fetchGitStatus()}
+            title={gitStatus.dirty ? `${gitStatus.branch} (dirty)` : gitStatus.branch}
+          >
+            <span>⎇ {gitStatus.branch}</span>
+            {gitStatus.dirty && <span className="dirty">●</span>}
+          </button>
+        )}
+        <StatusBadge status={status} />
+        <div className="actions">
+          <CHButton size="sm" onClick={handleClear} title="Clear buffer">
+            clear
+          </CHButton>
+          <CHButton size="sm" onClick={handleSave} title="Download buffer as .txt">
+            save
+          </CHButton>
+          <CHButton
             size="sm"
-            variant="ghost"
+            variant="outline"
             onClick={() => {
               close();
-              // Mini-reset: re-connect with same config.
               const cols = termRef.current?.cols ?? 80;
               const rows = termRef.current?.rows ?? 24;
               connect({
@@ -238,11 +249,11 @@ export function Terminal({ cwd, shell, args, initCommand, tabId }: TerminalProps
               });
             }}
           >
-            Restart
-          </Button>
-        </span>
+            restart
+          </CHButton>
+        </div>
       </div>
-      <div ref={hostRef} className="min-h-0 flex-1" />
+      <div ref={hostRef} className="term-body" style={{ padding: 0 }} />
     </div>
   );
 }
@@ -260,11 +271,13 @@ function serializeTerminalBuffer(term: import('@xterm/xterm').Terminal): string 
 }
 
 function StatusBadge({ status }: { status: PtyStatus }) {
-  const colors: Record<PtyStatus, string> = {
-    connecting: 'bg-amber-900/60 text-amber-200',
-    ready: 'bg-emerald-900/60 text-emerald-200',
-    closed: 'bg-neutral-800 text-neutral-400',
-    error: 'bg-red-900/60 text-red-200',
-  };
-  return <span className={`rounded px-1.5 py-0.5 text-[10px] ${colors[status]}`}>{status}</span>;
+  const variant =
+    status === 'ready'
+      ? 'emerald'
+      : status === 'connecting'
+        ? 'gold'
+        : status === 'error'
+          ? 'red'
+          : 'default';
+  return <Badge variant={variant}>{status}</Badge>;
 }

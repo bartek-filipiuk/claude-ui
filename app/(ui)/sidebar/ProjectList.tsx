@@ -1,18 +1,17 @@
 'use client';
 
 import { useCallback, useMemo, useState } from 'react';
-import { ChevronDown, ChevronRight, Star } from 'lucide-react';
 import { useProjects, type ProjectSummary } from '@/hooks/use-projects';
 import { useProjectMeta, useSetProjectMeta, type ProjectMetaMap } from '@/hooks/use-project-meta';
 import { useSessions } from '@/hooks/use-sessions';
 import { useUiStore } from '@/stores/ui-slice';
-import { Button } from '@/components/ui/button';
+import { CHButton } from '@/components/ui/ch-button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Select } from '@/components/ui/select';
+import { IconStar, IconChev } from '@/components/ui/icons';
 import { timeAgo } from '@/lib/ui/format';
 import { formatUsd } from '@/lib/jsonl/usage';
-import { isProjectGrouping, isSortMode, type SortMode } from '@/lib/ui/layout-storage';
+import type { SortMode } from '@/lib/ui/layout-storage';
 import { groupProjectsByPrefix, type ProjectGroup } from '@/lib/projects/group-by-prefix';
 import { cn } from '@/lib/utils';
 
@@ -52,9 +51,7 @@ export function ProjectList() {
   const selectedSlug = useUiStore((s) => s.selectedProjectSlug);
   const setSelected = useUiStore((s) => s.setSelectedProject);
   const sortMode = useUiStore((s) => s.sortMode);
-  const setSortMode = useUiStore((s) => s.setSortMode);
   const grouping = useUiStore((s) => s.projectGrouping);
-  const setGrouping = useUiStore((s) => s.setProjectGrouping);
 
   const isGrouped = grouping === 'prefix';
 
@@ -112,47 +109,25 @@ export function ProjectList() {
   };
 
   return (
-    <ScrollArea className="h-full">
-      <div className="flex flex-col gap-1 px-3 pb-1 pt-2">
-        <div className="flex items-center justify-between">
-          <span className="text-[10px] uppercase tracking-wider text-neutral-500">Sort</span>
-          <Select
-            aria-label="Project sort order"
-            value={sortMode}
-            onChange={(e) => {
-              const next = e.target.value;
-              if (isSortMode(next)) setSortMode(next);
-            }}
-          >
-            <option value="activity">Last activity</option>
-            <option value="name">Name</option>
-            <option value="sessions">Session count</option>
-          </Select>
-        </div>
-        <div className="flex items-center justify-between">
-          <span className="text-[10px] uppercase tracking-wider text-neutral-500">View</span>
-          <Select
-            aria-label="Project grouping"
-            value={grouping}
-            onChange={(e) => {
-              const next = e.target.value;
-              if (isProjectGrouping(next)) setGrouping(next);
-            }}
-          >
-            <option value="flat">Flat</option>
-            <option value="prefix">By folder</option>
-          </Select>
-        </div>
-      </div>
+    <ScrollArea className="sidebar-body">
       {isGrouped ? (
         <GroupedProjects groups={groups} renderItem={renderItem} />
       ) : (
-        <ul className="flex flex-col gap-0.5 p-2" role="list">
+        <div role="list">
           {visible.map(renderItem)}
           {visible.length === 0 && (
-            <li className="px-3 py-6 text-center text-xs text-neutral-500">No matches.</li>
+            <div
+              style={{
+                padding: '16px 20px',
+                fontSize: 11,
+                color: 'var(--fg-4)',
+                textAlign: 'center',
+              }}
+            >
+              No matches.
+            </div>
           )}
-        </ul>
+        </div>
       )}
     </ScrollArea>
   );
@@ -177,37 +152,37 @@ function GroupedProjects({
 
   if (groups.length === 0) {
     return (
-      <ul className="flex flex-col gap-0.5 p-2" role="list">
-        <li className="px-3 py-6 text-center text-xs text-neutral-500">No matches.</li>
-      </ul>
+      <div
+        style={{
+          padding: '16px 20px',
+          fontSize: 11,
+          color: 'var(--fg-4)',
+          textAlign: 'center',
+        }}
+      >
+        No matches.
+      </div>
     );
   }
 
   return (
-    <div className="flex flex-col p-2">
+    <div>
       {groups.map((group) => {
         const isOpen = openMap[group.key] !== false;
         return (
-          <section key={group.key} className="flex flex-col">
+          <section key={group.key}>
             <button
               type="button"
               aria-expanded={isOpen}
               onClick={() => setOpen(group.key, !isOpen)}
-              className="flex items-center gap-1.5 rounded-md px-2 py-1 text-left text-[11px] uppercase tracking-wider text-neutral-400 hover:bg-neutral-900 hover:text-neutral-200"
+              className="section-head clickable"
+              style={{ width: '100%', border: 0, background: 'transparent' }}
             >
-              {isOpen ? (
-                <ChevronDown aria-hidden className="h-3 w-3" />
-              ) : (
-                <ChevronRight aria-hidden className="h-3 w-3" />
-              )}
-              <span className="min-w-0 flex-1 truncate">{group.label}</span>
-              <span className="tabular-nums text-neutral-500">{group.items.length}</span>
+              <IconChev dir={isOpen ? 'down' : 'right'} />
+              <span>{group.label}</span>
+              <span className="count">{group.items.length}</span>
             </button>
-            {isOpen && (
-              <ul className="flex flex-col gap-0.5 pb-1 pl-1" role="list">
-                {group.items.map(renderItem)}
-              </ul>
-            )}
+            {isOpen && <div>{group.items.map(renderItem)}</div>}
           </section>
         );
       })}
@@ -278,67 +253,56 @@ function ProjectItem({
   onSelect: () => void;
   onToggleFavorite: () => void;
 }) {
-  const path = project.resolvedCwd ?? project.displayPath;
-  const primary = alias ?? path;
-  const tooltipBase = `${alias ? alias + '\n' : ''}${path}\nslug: ${project.slug}`;
-  const tooltip =
-    costUsd !== null ? `${tooltipBase}\nszacowany koszt: ${formatUsd(costUsd)}` : tooltipBase;
+  const path = project.resolvedCwd ?? project.displayPath ?? project.slug;
+  const primary = alias ?? path.split('/').pop() ?? path;
+  const tooltip = `${alias ? alias + '\n' : ''}${path}\nslug: ${project.slug}`;
+
   return (
-    <li
-      className={cn(
-        'flex min-w-0 items-center gap-1 rounded-md pr-1',
-        active ? 'bg-neutral-800' : 'hover:bg-neutral-900',
-      )}
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onSelect}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onSelect();
+        }
+      }}
+      title={tooltip}
+      className={cn('proj', active && 'active', favorite && 'fav')}
     >
       <button
         type="button"
-        aria-label={favorite ? 'Odepnij projekt' : 'Przypnij projekt'}
+        className="star"
+        aria-label={favorite ? 'Unpin project' : 'Pin project'}
         aria-pressed={favorite}
         onClick={(e) => {
           e.stopPropagation();
           onToggleFavorite();
         }}
-        className={cn(
-          'flex h-6 w-6 shrink-0 items-center justify-center rounded text-neutral-500 hover:text-yellow-300',
-          favorite && 'text-yellow-300',
-        )}
-        title={favorite ? 'Odepnij projekt' : 'Przypnij projekt'}
+        title={favorite ? 'Unpin' : 'Pin'}
       >
-        <Star
-          aria-hidden
-          className="h-3.5 w-3.5"
-          fill={favorite ? 'currentColor' : 'none'}
-          strokeWidth={1.75}
-        />
+        <IconStar filled={favorite} />
       </button>
-      <button
-        type="button"
-        onClick={onSelect}
-        title={tooltip}
-        className="flex min-w-0 flex-1 items-center justify-between gap-2 py-2 pl-1 pr-2 text-left"
-      >
-        <span className="min-w-0 flex-1 truncate">
-          {alias ? (
-            <span className="text-xs font-medium text-neutral-100">{primary}</span>
-          ) : (
-            <span className="font-mono text-xs text-neutral-300">{primary}</span>
-          )}
+      <div className="name">
+        <span className="primary">{primary}</span>
+        <span className="path">{path}</span>
+      </div>
+      <div className="meta">
+        {costUsd !== null && <span className="cost">{formatUsd(costUsd)}</span>}
+        <span>
+          {project.sessionCount}s · {timeAgo(project.lastActivity)}
         </span>
-        <span className="ml-2 inline-flex shrink-0 items-center gap-2 text-[10px] text-neutral-400">
-          {costUsd !== null && <span className="tabular-nums">{formatUsd(costUsd)}</span>}
-          <span>{project.sessionCount}</span>
-          <span>{timeAgo(project.lastActivity)}</span>
-        </span>
-      </button>
-    </li>
+      </div>
+    </div>
   );
 }
 
 function LoadingState() {
   return (
-    <div className="flex flex-col gap-2 p-2">
+    <div className="sidebar-body" style={{ padding: 12 }}>
       {Array.from({ length: 6 }).map((_, i) => (
-        <Skeleton key={i} className="h-9 w-full" />
+        <Skeleton key={i} className="mb-1 h-9 w-full" />
       ))}
     </div>
   );
@@ -346,23 +310,21 @@ function LoadingState() {
 
 function ErrorState({ onRetry }: { onRetry: () => void }) {
   return (
-    <div className="flex flex-col items-start gap-2 p-4 text-sm text-red-400">
-      <p>Failed to load the project list.</p>
-      <Button size="sm" variant="outline" onClick={onRetry}>
+    <div className="sidebar-body" style={{ padding: 16, color: 'var(--red)' }}>
+      <p style={{ fontSize: 12, marginBottom: 8 }}>Failed to load the project list.</p>
+      <CHButton variant="outline" size="sm" onClick={onRetry}>
         Retry
-      </Button>
+      </CHButton>
     </div>
   );
 }
 
 function EmptyState() {
   return (
-    <div className="flex flex-col gap-2 px-4 py-8 text-sm text-neutral-400">
-      <p className="font-medium text-neutral-200">No projects yet.</p>
-      <p className="text-xs text-neutral-500">
-        Run Claude Code inside a project at least once to populate this list. The{' '}
-        <code className="rounded bg-neutral-800 px-1">~/.claude/projects/</code> directory is
-        created on the first session.
+    <div className="sidebar-body" style={{ padding: '24px 20px', color: 'var(--fg-3)' }}>
+      <p style={{ color: 'var(--fg-1)', fontWeight: 500, marginBottom: 6 }}>No projects yet.</p>
+      <p style={{ fontSize: 11 }}>
+        Run Claude Code inside a project at least once to populate this list.
       </p>
     </div>
   );

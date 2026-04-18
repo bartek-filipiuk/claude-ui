@@ -15,7 +15,10 @@ export function TabManager() {
 
   if (tabs.length === 0) {
     return (
-      <div className="flex h-full items-center justify-center p-8 text-sm text-neutral-500">
+      <div
+        className="flex h-full items-center justify-center p-8 text-sm"
+        style={{ color: 'var(--fg-3)' }}
+      >
         No open terminal tabs.
       </div>
     );

@@ -132,8 +132,8 @@ export function ResizableColumns({ sidebar, sessions, viewer }: ResizableColumns
   return (
     <div
       ref={containerRef}
-      className="grid h-screen bg-neutral-950 text-neutral-100"
-      style={{ gridTemplateColumns: gridTemplate }}
+      className="grid h-screen text-[color:var(--fg-0)]"
+      style={{ gridTemplateColumns: gridTemplate, background: 'var(--bg-0)' }}
       data-testid="resizable-columns"
     >
       {sidebar}
@@ -148,7 +148,7 @@ export function ResizableColumns({ sidebar, sessions, viewer }: ResizableColumns
         onDoubleClick={onDoubleClick}
         onKeyDown={onKey('sidebar')}
         data-testid="splitter-sidebar"
-        className="cursor-col-resize touch-none border-l border-r border-neutral-800 bg-neutral-800 transition-colors hover:bg-neutral-700 focus:bg-blue-500 focus:outline-none"
+        className="cursor-col-resize touch-none bg-[var(--line)] transition-colors hover:bg-[var(--line-3)] focus:bg-[var(--gold-700)] focus:outline-none"
       />
       {sessions}
       <div
@@ -162,7 +162,7 @@ export function ResizableColumns({ sidebar, sessions, viewer }: ResizableColumns
         onDoubleClick={onDoubleClick}
         onKeyDown={onKey('sessions')}
         data-testid="splitter-sessions"
-        className="cursor-col-resize touch-none border-l border-r border-neutral-800 bg-neutral-800 transition-colors hover:bg-neutral-700 focus:bg-blue-500 focus:outline-none"
+        className="cursor-col-resize touch-none bg-[var(--line)] transition-colors hover:bg-[var(--line-3)] focus:bg-[var(--gold-700)] focus:outline-none"
       />
       {viewer}
     </div>

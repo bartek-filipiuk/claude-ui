@@ -173,7 +173,7 @@ describe('costForUsage', () => {
       },
       'claude-opus-4-7',
     );
-    expect(cost).toBeCloseTo(18.75 + 2 * 1.5, 6);
+    expect(cost).toBeCloseTo(6.25 + 2 * 0.5, 6);
   });
   it('uses default rate when model unknown', () => {
     const cost = costForUsage(
@@ -220,8 +220,8 @@ describe('sumUsage / estimateSessionCost', () => {
     const cost = estimateSessionCost(events);
     expect(cost.eventsWithUsage).toBe(2);
     // sonnet: (100 * 3 + 50 * 15) / 1e6 = 0.00105
-    // opus:   (200 * 15 + 40 * 75 + 1000 * 1.5) / 1e6 = 0.0075
-    expect(cost.totalUsd).toBeCloseTo(0.00105 + 0.0075, 6);
+    // opus:   (200 * 5 + 40 * 25 + 1000 * 0.5) / 1e6 = 0.0025
+    expect(cost.totalUsd).toBeCloseTo(0.00105 + 0.0025, 6);
   });
 
   it('honors a custom pricing table', () => {

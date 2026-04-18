@@ -28,23 +28,33 @@ DialogOverlay.displayName = DialogPrimitive.Overlay.displayName;
 
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & { hideClose?: boolean }
->(({ className, children, hideClose, ...props }, ref) => (
+  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & {
+    hideClose?: boolean;
+    /**
+     * When true, opt out of the default shell (padding, grid, border, rounded
+     * corners) so a fully custom chrome like `.ch-modal` can paint itself.
+     * Positioning + animation still come from Radix.
+     */
+    bare?: boolean;
+  }
+>(({ className, children, hideClose, bare = false, ...props }, ref) => (
   <DialogPortal>
-    <DialogOverlay />
+    <DialogOverlay className="overlay-scrim bg-transparent" />
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        'fixed left-1/2 top-1/2 z-50 grid w-full max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 border border-neutral-800 bg-neutral-950 p-6 text-neutral-50 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 rounded-lg',
+        'fixed left-1/2 top-1/2 z-50 w-full -translate-x-1/2 -translate-y-1/2 duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
+        !bare &&
+          'grid max-w-lg gap-4 border border-[color:var(--line-3)] bg-[color:var(--bg-1)] p-6 text-[color:var(--fg-0)] shadow-lg rounded-lg',
         className,
       )}
       {...props}
     >
       {children}
-      {!hideClose ? (
+      {!hideClose && !bare ? (
         <DialogPrimitive.Close
-          className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-neutral-950 transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-neutral-300 focus:ring-offset-2 disabled:pointer-events-none"
-          aria-label="Zamknij"
+          className="absolute right-4 top-4 rounded-sm opacity-70 transition-opacity hover:opacity-100 focus:outline-none focus-visible:ring-1 focus-visible:ring-[color:var(--gold-500)] disabled:pointer-events-none"
+          aria-label="Close"
         >
           <X className="h-4 w-4" />
         </DialogPrimitive.Close>
