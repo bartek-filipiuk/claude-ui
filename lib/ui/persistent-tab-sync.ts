@@ -76,3 +76,16 @@ export function deletePersistentTab(persistentId: string): void {
     headers: csrfHeaders(),
   }).catch(() => undefined);
 }
+
+/** Persists a tab rename server-side so the new title survives reloads on
+ * any browser that reads the same ~/.codehelm. Fire-and-forget — the UI has
+ * already updated Zustand synchronously. */
+export function renamePersistentTab(persistentId: string, title: string): void {
+  if (typeof fetch !== 'function') return;
+  void fetch(`/api/persistent-tabs/${persistentId}`, {
+    method: 'PUT',
+    credentials: 'same-origin',
+    headers: csrfHeaders(),
+    body: JSON.stringify({ title }),
+  }).catch(() => undefined);
+}

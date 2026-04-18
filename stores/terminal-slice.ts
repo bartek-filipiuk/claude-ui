@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { getTabAlias, patchTabAlias } from '@/lib/ui/tab-aliases';
 import {
   deletePersistentTab,
+  renamePersistentTab,
   type ServerPersistentTab,
 } from '@/lib/ui/persistent-tab-sync';
 
@@ -153,7 +154,14 @@ export const useTerminalStore = create<State>((set, get) => ({
     const tab = tabs.find((t) => t.id === id);
     if (!tab) return;
     set({ tabs: tabs.map((t) => (t.id === id ? { ...t, title: trimmed } : t)) });
+    // Persist the rename. Server-side is authoritative when any pane is
+    // persistent — the title travels with ~/.codehelm regardless of browser.
+    // localStorage is still written as a fallback for tabs that never
+    // registered server-side (creation failure, 16-PTY cap, offline).
     if (tab.aliasKey) patchTabAlias(tab.aliasKey, trimmed);
+    for (const pane of tab.panes) {
+      if (pane.persistentId) renamePersistentTab(pane.persistentId, trimmed);
+    }
   },
   clear: () => set({ tabs: [], activeTabId: null }),
   registerWriter: (id, writer) => {
@@ -279,6 +287,9 @@ export const useTerminalStore = create<State>((set, get) => ({
       seq += 1;
       const tabId = `t-${now}-${seq}-h`;
       const paneId = `p-${now}-${seq}-h`;
+      // Server-side title is authoritative since renameTab now PUTs server-side.
+      // localStorage fallback is only used when the server title is empty
+      // (defensive — schema requires non-empty but old rows might be odd).
       const savedAlias = getTabAlias(s.aliasKey ?? undefined);
       const pane: TerminalPane = {
         id: paneId,
@@ -293,7 +304,7 @@ export const useTerminalStore = create<State>((set, get) => ({
         cwd: s.cwd,
         ...(s.shell !== undefined ? { shell: s.shell } : {}),
         ...(s.args !== undefined ? { args: s.args } : {}),
-        title: savedAlias ?? s.title,
+        title: s.title || savedAlias || 'persistent-tab',
         createdAt: s.createdAt,
         ...(s.aliasKey ? { aliasKey: s.aliasKey } : {}),
         layout: 'single' as TerminalLayout,
