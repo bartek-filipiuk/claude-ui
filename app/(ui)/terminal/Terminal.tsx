@@ -88,13 +88,11 @@ export function Terminal({ cwd, shell, args, initCommand, paneId }: TerminalProp
     if (!hostRef.current || termRef.current) return;
     let disposed = false;
     (async () => {
-      const [{ Terminal: XTerm }, { FitAddon }, { WebLinksAddon }, { WebglAddon }] =
-        await Promise.all([
-          import('@xterm/xterm'),
-          import('@xterm/addon-fit'),
-          import('@xterm/addon-web-links'),
-          import('@xterm/addon-webgl'),
-        ]);
+      const [{ Terminal: XTerm }, { FitAddon }, { WebLinksAddon }] = await Promise.all([
+        import('@xterm/xterm'),
+        import('@xterm/addon-fit'),
+        import('@xterm/addon-web-links'),
+      ]);
       if (disposed) return;
       const term = new XTerm({
         convertEol: false,
@@ -114,14 +112,6 @@ export function Terminal({ cwd, shell, args, initCommand, paneId }: TerminalProp
       term.loadAddon(links);
       if (!hostRef.current) return;
       term.open(hostRef.current);
-      // WebGL renderer for throughput; xterm auto-falls-back to DOM on context loss.
-      try {
-        const webgl = new WebglAddon();
-        webgl.onContextLoss(() => webgl.dispose());
-        term.loadAddon(webgl);
-      } catch {
-        // WebGL2 unavailable or blocked — stay on default DOM renderer.
-      }
       try {
         fit.fit();
       } catch {
@@ -147,9 +137,16 @@ export function Terminal({ cwd, shell, args, initCommand, paneId }: TerminalProp
     })();
     return () => {
       disposed = true;
+      if (resizeTimeoutRef.current) {
+        clearTimeout(resizeTimeoutRef.current);
+        resizeTimeoutRef.current = null;
+      }
+      // Null the fit ref before disposing the terminal so any in-flight
+      // ResizeObserver / custom-event handler that reaches `fitRef.current?.fit()`
+      // becomes a no-op instead of hitting a terminal whose internals are gone.
+      fitRef.current = null;
       termRef.current?.dispose();
       termRef.current = null;
-      fitRef.current = null;
       close();
     };
     // Only on mount: cwd/shell/args are fixed per terminal instance.
