@@ -1,5 +1,10 @@
 import { create } from 'zustand';
-import { getTabAlias, patchTabAlias } from '@/lib/ui/tab-aliases';
+import { patchTabAlias } from '@/lib/ui/tab-aliases';
+import {
+  deletePersistentTab,
+  renamePersistentTab,
+  type ServerPersistentTab,
+} from '@/lib/ui/persistent-tab-sync';
 
 export type TerminalLayout = 'single' | 'h' | 'v' | 'quad';
 
@@ -9,6 +14,8 @@ export interface TerminalPane {
   shell?: string;
   args?: string[];
   initCommand?: string;
+  /** If set, the pane attaches to a persistent PTY instead of spawning. */
+  persistentId?: string;
 }
 
 export interface TerminalTab {
@@ -40,6 +47,8 @@ export interface TerminalCfg {
   initCommand?: string;
   title: string;
   aliasKey?: string;
+  /** Attach to existing persistent PTY instead of spawning a new one. */
+  persistentId?: string;
 }
 
 const MAX_TABS = 16;
@@ -71,6 +80,11 @@ interface State {
   setActivePane: (tabId: string, paneId: string) => void;
   closePane: (tabId: string, paneId: string) => void;
   sendToActivePane: (data: string) => boolean;
+  /** Attach a server-side persistent PTY id to an already-open pane. */
+  setPanePersistentId: (tabId: string, paneId: string, persistentId: string) => void;
+  /** Merge server-side persistent tabs into the store, adding any that are not
+   * yet represented. Does not disturb existing tabs. */
+  hydrate: (tabs: ServerPersistentTab[]) => void;
 }
 
 export const useTerminalStore = create<State>((set, get) => ({
@@ -84,13 +98,13 @@ export const useTerminalStore = create<State>((set, get) => ({
     const nextSeq = _seq + 1;
     const id = `t-${Date.now()}-${nextSeq}`;
     const paneId = `p-${Date.now()}-${nextSeq}`;
-    const savedAlias = getTabAlias(cfg.aliasKey);
     const pane: TerminalPane = {
       id: paneId,
       cwd: cfg.cwd,
       ...(cfg.shell !== undefined ? { shell: cfg.shell } : {}),
       ...(cfg.args !== undefined ? { args: cfg.args } : {}),
       ...(cfg.initCommand !== undefined ? { initCommand: cfg.initCommand } : {}),
+      ...(cfg.persistentId !== undefined ? { persistentId: cfg.persistentId } : {}),
     };
     const tab: TerminalTab = {
       id,
@@ -99,7 +113,11 @@ export const useTerminalStore = create<State>((set, get) => ({
       ...(cfg.shell !== undefined ? { shell: cfg.shell } : {}),
       ...(cfg.args !== undefined ? { args: cfg.args } : {}),
       ...(cfg.initCommand !== undefined ? { initCommand: cfg.initCommand } : {}),
-      title: savedAlias ?? cfg.title,
+      // Every new tab uses cfg.title as its default. Rename persistence lives
+      // server-side (per unique persistentId), so NOT looking up the alias
+      // here prevents sibling shell tabs — which share aliasKey
+      // `shell:<slug>:<cwd>` — from inheriting each other's rename.
+      title: cfg.title,
       createdAt: Date.now(),
       ...(cfg.aliasKey ? { aliasKey: cfg.aliasKey } : {}),
       layout: 'single',
@@ -113,6 +131,7 @@ export const useTerminalStore = create<State>((set, get) => ({
     const { tabs, activeTabId } = get();
     const idx = tabs.findIndex((t) => t.id === id);
     if (idx === -1) return;
+    const closing = tabs[idx];
     const next = tabs.filter((t) => t.id !== id);
     let nextActive = activeTabId;
     if (activeTabId === id) {
@@ -120,6 +139,13 @@ export const useTerminalStore = create<State>((set, get) => ({
       nextActive = neighbour?.id ?? null;
     }
     set({ tabs: next, activeTabId: nextActive });
+    // Explicit close = kill the PTY on the server side for every persistent
+    // pane belonging to this tab. Fire-and-forget; the UI is already updated.
+    if (closing) {
+      for (const pane of closing.panes) {
+        if (pane.persistentId) deletePersistentTab(pane.persistentId);
+      }
+    }
   },
   setActive: (id) => {
     if (get().tabs.some((t) => t.id === id)) set({ activeTabId: id });
@@ -131,7 +157,14 @@ export const useTerminalStore = create<State>((set, get) => ({
     const tab = tabs.find((t) => t.id === id);
     if (!tab) return;
     set({ tabs: tabs.map((t) => (t.id === id ? { ...t, title: trimmed } : t)) });
+    // Persist the rename. Server-side is authoritative when any pane is
+    // persistent — the title travels with ~/.codehelm regardless of browser.
+    // localStorage is still written as a fallback for tabs that never
+    // registered server-side (creation failure, 16-PTY cap, offline).
     if (tab.aliasKey) patchTabAlias(tab.aliasKey, trimmed);
+    for (const pane of tab.panes) {
+      if (pane.persistentId) renamePersistentTab(pane.persistentId, trimmed);
+    }
   },
   clear: () => set({ tabs: [], activeTabId: null }),
   registerWriter: (id, writer) => {
@@ -200,6 +233,7 @@ export const useTerminalStore = create<State>((set, get) => ({
     const state = get();
     const tab = state.tabs.find((t) => t.id === tabId);
     if (!tab) return;
+    const closingPane = tab.panes.find((p) => p.id === paneId);
     const remaining = tab.panes.filter((p) => p.id !== paneId);
     if (remaining.length === 0) {
       get().closeTab(tabId);
@@ -221,6 +255,70 @@ export const useTerminalStore = create<State>((set, get) => ({
         t.id === tabId ? { ...t, panes: remaining, layout, activePaneId } : t,
       ),
     });
+    if (closingPane?.persistentId) deletePersistentTab(closingPane.persistentId);
+  },
+  setPanePersistentId: (tabId, paneId, persistentId) => {
+    set((state) => ({
+      tabs: state.tabs.map((t) =>
+        t.id !== tabId
+          ? t
+          : {
+              ...t,
+              panes: t.panes.map((p) =>
+                p.id === paneId ? { ...p, persistentId } : p,
+              ),
+            },
+      ),
+    }));
+  },
+  hydrate: (serverTabs) => {
+    if (!serverTabs.length) return;
+    const state = get();
+    const knownPersistentIds = new Set<string>();
+    for (const t of state.tabs) {
+      for (const p of t.panes) {
+        if (p.persistentId) knownPersistentIds.add(p.persistentId);
+      }
+    }
+    const toAdd = serverTabs.filter((t) => !knownPersistentIds.has(t.persistentId));
+    if (toAdd.length === 0) return;
+    const cap = Math.max(0, MAX_TABS - state.tabs.length);
+    const take = toAdd.slice(0, cap);
+    let seq = state._seq;
+    const now = Date.now();
+    const newTabs: TerminalTab[] = take.map((s) => {
+      seq += 1;
+      const tabId = `t-${now}-${seq}-h`;
+      const paneId = `p-${now}-${seq}-h`;
+      // Server-side title is authoritative — renameTab PUTs there. No
+      // localStorage fallback because that keys on aliasKey (non-unique for
+      // shell tabs) and would clobber sibling titles.
+      const pane: TerminalPane = {
+        id: paneId,
+        cwd: s.cwd,
+        ...(s.shell !== undefined ? { shell: s.shell } : {}),
+        ...(s.args !== undefined ? { args: s.args } : {}),
+        persistentId: s.persistentId,
+      };
+      return {
+        id: tabId,
+        projectSlug: s.projectSlug ?? null,
+        cwd: s.cwd,
+        ...(s.shell !== undefined ? { shell: s.shell } : {}),
+        ...(s.args !== undefined ? { args: s.args } : {}),
+        title: s.title || 'persistent-tab',
+        createdAt: s.createdAt,
+        ...(s.aliasKey ? { aliasKey: s.aliasKey } : {}),
+        layout: 'single' as TerminalLayout,
+        panes: [pane],
+        activePaneId: paneId,
+      };
+    });
+    set((curr) => ({
+      _seq: seq,
+      tabs: [...curr.tabs, ...newTabs],
+      activeTabId: curr.activeTabId ?? newTabs[0]?.id ?? null,
+    }));
   },
 }));
 
