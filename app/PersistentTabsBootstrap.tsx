@@ -1,40 +1,37 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { useTerminalStore } from '@/stores/terminal-slice';
 import { useUiStore } from '@/stores/ui-slice';
 import { fetchPersistentTabs } from '@/lib/ui/persistent-tab-sync';
 
 /**
- * Fetches persistent tabs from the server once at mount and hydrates the
- * terminal store. If anything came back, also:
- *   - pre-selects a project (first restored tab with a projectSlug) so the
- *     sidebar highlights something and `+ new shell` has a valid context,
- *   - flips the main panel into terminal mode so the user sees their
- *     previous workspace immediately.
+ * Keeps the terminal store in sync with the server's persistent-tab list.
  *
- * Rendered as a sibling of the main layout (see `app/page.tsx`) so it runs
- * regardless of which panel mode is active — previously hydration lived in
- * `TabManager`, which only mounts inside terminal mode and therefore left
- * the store empty on a fresh browser load.
+ * This runs on every mount (not gated by a ref) because `/jobs` CRUD can
+ * mutate the server-side set while the user is away from the main page.
+ * When they return, the page re-mounts and we reconcile: add anything the
+ * server has that we do not, remove anything we carry that the server
+ * forgot. The hydrate action is idempotent + cheap — one HTTP GET + a
+ * Zustand set — so running it more than once is fine.
+ *
+ * The UX sugar (auto-select a project, flip into terminal mode) only
+ * happens on the first cold mount, detected by `tabs.length === 0`
+ * before the hydrate. Subsequent mounts just reconcile silently so we do
+ * not yank the user out of viewer / editor mode on every navigation.
  */
 export function PersistentTabsBootstrap() {
   const hydrate = useTerminalStore((s) => s.hydrate);
   const openTerminal = useUiStore((s) => s.openTerminal);
   const setSelectedProject = useUiStore((s) => s.setSelectedProject);
-  const hydratedRef = useRef(false);
 
   useEffect(() => {
-    if (hydratedRef.current) return;
-    hydratedRef.current = true;
     void fetchPersistentTabs().then((serverTabs) => {
-      if (serverTabs.length === 0) return;
+      const hadTabsBefore = useTerminalStore.getState().tabs.length > 0;
       hydrate(serverTabs);
-      // Only overwrite the sidebar selection if the user hasn't already
-      // picked a project themselves (rare race — they clicked during the
-      // in-flight fetch). Otherwise pick the first restored tab that belongs
-      // to a project so the sidebar is highlighted and the `+` button in
-      // MainPanel has a valid cwd to spawn a new shell for.
+      if (hadTabsBefore) return;
+      if (serverTabs.length === 0) return;
+      // Cold start with server-side tabs — pick a project and show them.
       const firstWithProject = serverTabs.find((t) => t.projectSlug);
       if (firstWithProject?.projectSlug && !useUiStore.getState().selectedProjectSlug) {
         setSelectedProject(firstWithProject.projectSlug);

@@ -2,6 +2,7 @@ import type { WebSocket } from 'ws';
 import { z } from 'zod';
 import { ptyManager, type PtyHandle } from '@/lib/pty/manager';
 import { persistentTabsRegistry } from '@/lib/pty/persistent-tabs-registry';
+import { respawnPersistentTab } from '@/lib/pty/persistent-tabs-service';
 import { logger } from '@/lib/server/logger';
 
 const SpawnMsg = z.object({
@@ -167,7 +168,31 @@ export function attachPtyChannel(ws: WebSocket, csrfCookieValue: string): void {
         }
         return;
       }
-      const entry = persistentTabsRegistry.getEntry(msg.persistentId);
+      let entry = persistentTabsRegistry.getEntry(msg.persistentId);
+      let handle = entry ? ptyManager.get(entry.ptyId) : undefined;
+      // Self-healing path: the registry may have forgotten this tab because
+      // the underlying PTY exited (shell `exit`, crash) while the client was
+      // elsewhere. The file-backed store still has the row, so try to
+      // respawn it. If the file doesn't have it either, the tab is truly
+      // gone (e.g. deleted via /jobs) and we return persistent_not_found.
+      if (!entry || !handle) {
+        try {
+          const fresh = await respawnPersistentTab(msg.persistentId);
+          if (fresh) {
+            entry = persistentTabsRegistry.getEntry(msg.persistentId);
+            handle = fresh;
+            logger.info(
+              { persistentId: msg.persistentId, ptyId: fresh.id },
+              'attach_auto_respawned',
+            );
+          }
+        } catch (err) {
+          logger.warn(
+            { err: (err as Error).message, persistentId: msg.persistentId },
+            'attach_respawn_failed',
+          );
+        }
+      }
       if (!entry) {
         logger.warn(
           {
@@ -179,7 +204,6 @@ export function attachPtyChannel(ws: WebSocket, csrfCookieValue: string): void {
         send(ws, { type: 'error', code: 'persistent_not_found' });
         return;
       }
-      const handle = ptyManager.get(entry.ptyId);
       if (!handle) {
         logger.warn(
           { persistentId: msg.persistentId, ptyId: entry.ptyId },
