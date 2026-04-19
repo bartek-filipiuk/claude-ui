@@ -119,7 +119,9 @@ one-shot token you never see.
 | Session list     | Preview, size, message count, relative mtime, cost estimate per session                     |
 | Viewer           | Streaming JSONL, virtualised, 9 event types, search + filters, outline/minimap, stats bar   |
 | Conversation UX  | Diff rendering for `Edit`/`Write` tool results, parent `tool_use` popover, replay mode      |
-| Terminal         | Up to 16 concurrent PTYs, quick-actions row, git branch badge, clear/save buffer            |
+| Terminal         | Up to 16 concurrent PTYs, persistent across reload/restart, quick-actions row, git branch badge, clear/save buffer |
+| Scheduled prompts| `/jobs` CRUD, `croner` in-process scheduler, hybrid ready-check (prompt marker OR idle > 3 s), retry on not-ready, per-job runs log, sidebar widget |
+| Persistent tabs  | Server-side PTY registry auto-respawned at startup, tabs survive browser reload + `codehelm` restart, explicit close kills on server too |
 | Editor           | CodeMirror 6, markdown preview split, diff-before-save, recent files dropdown, atomic write |
 | Live updates     | chokidar → WebSocket → TanStack Query invalidation, toast notifications                     |
 | Command UX       | Command palette (`Ctrl+K`), keyboard shortcuts overlay (`?`), jump-to-event input           |
@@ -129,6 +131,57 @@ one-shot token you never see.
 | Path traversal   | `fs.realpath` + prefix equality (fuzz-tested, 100 payloads)                                 |
 | Audit log        | Whitelisted fields only, 0600 file, 0700 dir                                                |
 | Platform         | Linux + macOS helpers (`lib/server/platform.ts`), `npx codehelm-install` bootstrap          |
+
+---
+
+## Scheduled prompts (cron)
+
+`codehelm` can type a prompt into a long-lived Claude Code tab on a cron
+schedule. The terminal remains the only surface that talks to Claude —
+the scheduler just writes into its PTY as if you hit Enter yourself.
+
+**Mental model.** You promote a terminal tab to a *persistent tab* (a PTY
+registered server-side, auto-respawned at startup, identified by a stable
+`cron_tag`). A *job* binds a cron expression + prompt to a `cron_tag`. At
+each tick the executor resolves the target, checks whether Claude looks
+idle (marker regex against the ring buffer OR `> 3 s` since last stdout),
+takes a per-tab lock, and writes `ESC[200~ <prompt> ESC[201~ \r`
+(bracketed paste so multiline prompts do not get split into separate
+Enter presses).
+
+**Where in the UI.**
+
+- Sidebar widget labeled `cron` — upcoming triggers + recent failures,
+  with a link to `/jobs`.
+- `/jobs` page has two sections: *Jobs* (list + form) and *Persistent
+  tabs* (register a new target, edit `cron_tag`, respawn dead PTYs).
+- `/jobs/<id>` shows the job detail + runs log (auto-refreshes every
+  5 s).
+
+**What is stored.**
+
+| File | Role |
+| ---- | ---- |
+| `~/.codehelm/persistent-tabs.json` | Persistent tab config: cwd, shell, `initCommand`, `cron_tag`, `projectSlug`, `aliasKey` |
+| `~/.codehelm/jobs.json` | Jobs: cron expression, target `cron_tag`, prompt, ready-check/retry settings |
+| `~/.codehelm/job-runs.jsonl` | Append-only run log, purged to last 100 entries per job every hour |
+| `~/.codehelm/audit.log` | One `cron.cron_write` entry per fired prompt — no prompt body, just lengths + status |
+
+**Safety rails.**
+
+- `cron_tag` matches `[a-z0-9][a-z0-9_-]{0,63}`. Rejected otherwise.
+- Prompt body capped at 16 KB.
+- Executor takes an in-memory 60 s mutex per persistent tab before
+  writing, so two jobs targeting the same tab cannot interleave.
+- Ready-check can be disabled per job, but defaults to on so cron does
+  not walk into the middle of another response.
+- `run now` button on `/jobs` lets you fire manually without editing
+  the cron expression — the happy path smoke test.
+
+See `docs/CRON-JOBS.md` for the full subsystem layout and known
+follow-ups. See `docs/PERSISTENT-TABS.md` for the persistent-tab side
+(including the split-layout-on-reload rough edge, with three fix paths
+sketched in cost order).
 
 ---
 
@@ -198,6 +251,21 @@ Whitelisted keys only: `ts, event, sessionId, pid, cwd, shell, cols,
 rows, path, bytes, writeKind`. Never env, never tokens, never content,
 never `stdout`/`stderr`. The pino logger redacts `token`, `authorization`,
 `cookie`, and `*.env` at emit time.
+
+Cron writes an extra event per fired job — `cron.cron_write` with
+`{jobId, persistentTabId, cronTag, promptLen, status, attempt}`. The
+prompt **body** is never logged, only its length.
+
+**Scheduled prompts**
+
+- `cron_tag` matches `[a-z0-9][a-z0-9_-]{0,63}`; creation with any other
+  shape returns 400 before the PTY is spawned.
+- Prompt body capped at 16 KB (`DataMsg.max(64 * 1024)` aligned, stricter
+  for the cron write path).
+- The scheduler runs in-process: jobs fire only while `codehelm` is
+  alive. No background daemon, no cloud callback.
+- Persistent tabs count against the 16-PTY cap. The 17th spawn falls
+  back to ephemeral mode.
 
 **Resource caps**
 
@@ -275,32 +343,43 @@ middleware.ts (Next edge, nonce only)
 
 lib/
 ├── security/    token, csrf, host-check, path-guard (realpath), csp, nonce
-├── server/      config, port finder, logger (pino redact), audit, middleware
+├── server/      config, port finder, logger (pino redact), audit,
+│                middleware, singleton (globalThis-stashed singletons so
+│                tsx + webpack module graphs share one instance)
 ├── jsonl/       Zod schemas (9 types), readline parser, listProjects,
 │                slug codec, Markdown export, in-session search
-├── pty/         singleton manager (cap + rate + backpressure), spawn,
-│                audit facade
+├── pty/         singleton manager (cap + rate + backpressure + ring
+│                buffer + isReady), spawn, audit facade,
+│                persistent-tabs-{store,registry,service}, ready-check
+├── cron/        jobs-store, runs-store, scheduler (croner), executor
+│                (bracketed-paste write + mutex), tab-lock
 ├── watcher/     chokidar singleton, debounce 200ms, depth 2, no symlinks
 ├── ws/          upgrade router, pty-channel (Zod wire protocol + flow
-│                control), watch-channel (batched push, 100ms / 50 ev)
+│                control, spawn OR attach), watch-channel (batched push)
+├── ui/          tab-aliases, pane-sizes, persistent-tab-sync
 ├── claude-md/   write-guard (byte-exact CLAUDE.md invariant), atomic io
 └── aliases/     slug → alias map, atomic JSON write
 
 app/
-├── layout.tsx, page.tsx
-├── (ui)/sidebar/         Search, ProjectList
+├── layout.tsx, page.tsx, PersistentTabsBootstrap.tsx (top-level hydrate)
+├── (ui)/sidebar/         Search, ProjectList, CronWidget
 ├── (ui)/session-explorer/ SessionList, ProjectHeader (rename inline)
 ├── (ui)/conversation/    Viewer (virtuoso), MainPanel (mode switcher)
 ├── (ui)/terminal/        Terminal (xterm), TabBar, TabManager
 ├── (ui)/editor/          MarkdownEditor (CodeMirror 6)
+├── jobs/                 /jobs page (list + CRUD), /jobs/[id] (runs log),
+│                         PersistentTabsPanel, JobFormDialog
 └── api/
     ├── auth, healthz
     ├── projects, projects/[slug]/sessions, projects/aliases (GET/PATCH)
     ├── sessions/[id], sessions/[id]/export, sessions/new
-    └── claude-md, claude-md/[slug]
+    ├── claude-md, claude-md/[slug]
+    ├── cron/jobs (GET/POST), cron/jobs/[id] (GET/PUT/DELETE),
+    │   cron/jobs/[id]/runs, cron/jobs/[id]/trigger, cron/dashboard
+    └── persistent-tabs (GET/POST), persistent-tabs/[id] (PUT/DELETE/POST)
 
 hooks/  use-projects, use-sessions, use-session-stream, use-pty, use-watch,
-        use-open-session, use-claude-md, use-aliases
+        use-open-session, use-claude-md, use-aliases, use-cron-jobs
 stores/ ui-slice, terminal-slice (zustand)
 ```
 
@@ -381,8 +460,13 @@ release marker with a passing gate suite.
 
 This is what `codehelm` explicitly does **not** try to do:
 
-- Send prompts through its own API. The embedded terminal is the
-  prompting interface.
+- Send prompts through its own API as a new chat surface. The embedded
+  terminal is still the prompting interface; cron jobs write into an
+  existing PTY as if the user typed, they do not speak to Anthropic
+  directly.
+- Parse Claude's response to chain jobs or flip feature flags based on
+  output. The scheduler is fire-only; output flows into the xterm buffer
+  for humans (or whatever tooling is watching `~/.claude/projects/*.jsonl`).
 - Sync state between machines. Run one instance per host.
 - Authenticate multiple users. Single user on a trusted machine.
 - Ship a mobile UI. Desktop-first.
@@ -418,6 +502,15 @@ Shipped since phase-7-done (T01–T29):
   bootstrap.
 - Full English UI + docs sweep with a source-tree-wide guard test
   against Polish diacritic regressions.
+- Scheduled prompts: `node-pty` ring buffer + hybrid ready-check,
+  `croner`-based in-process scheduler, `/jobs` CRUD + runs log +
+  dashboard widget, `cron.cron_write` audit entries.
+- Persistent terminal tabs: server-side registry + auto-respawn,
+  `attach` WebSocket protocol alongside `spawn`, bootstrap hydration on
+  app load, rename persisted server-side per persistent tab.
+- Cross-graph-safe singletons (`lib/server/singleton.ts`) so custom
+  server (tsx) and Next route handlers (webpack) share one
+  `ptyManager` / `persistentTabsRegistry` / cron scheduler.
 
 Open:
 

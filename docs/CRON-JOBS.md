@@ -82,3 +82,84 @@ not capture or parse Claude's response.
   `persistent-tabs.json` or delete it via the UI.
 - Scheduler runs `croner` in-process: jobs fire only while `codehelm` is
   running. For uptime use a systemd unit with `Restart=always`.
+
+## Manual test walkthrough
+
+End-to-end smoke test for a fresh install. Assumes `pnpm build` and
+`./bin/codehelm` already work.
+
+### 1. Register a persistent target
+
+1. Open the app. Click the `cron` widget in the sidebar (or navigate to
+   `/jobs`).
+2. Scroll to **Persistent tabs** and fill the form:
+   - **title** — free text, e.g. `daily-research`
+   - **cwd** — absolute path under `$HOME` (path-guard rejects anything
+     else), e.g. `/home/you/projects/example`
+   - **init command** — `claude` (or `claude --resume <session-id>` if
+     you want cron to keep typing into a specific session)
+   - **cron_tag** — unique, lowercase, e.g. `daily-research`
+3. Click `+ add`. The row appears with badge `alive`. The PTY is already
+   running in the background — verify with
+   `cat ~/.codehelm/persistent-tabs.json | jq '.tabs | length'`.
+
+### 2. Create a job
+
+1. Still on `/jobs`, click `+ new job` (enabled once at least one
+   persistent tab exists).
+2. Fill the form:
+   - **name** — `smoke test`
+   - **schedule** — pick *custom* and enter `* * * * *` (fires every
+     minute) for fast iteration.
+   - **target persistent tab** — select `daily-research` from the
+     dropdown.
+   - **prompt** — keep it short for the smoke test: `say hello`.
+   - Leave *ready-check* on so cron does not step over another response.
+3. Click `create`. The row appears with `last: never_run` and a `next
+   run` ETA.
+
+### 3. Trigger once by hand
+
+Click `run now` on the job row. Expected result in the table:
+
+- `last: sent` (green badge) — the prompt was written into the PTY.
+- `last: tab_not_ready` (gold) — Claude was streaming or not at a
+  prompt. A retry is scheduled if you enabled it.
+- `last: tab_not_found` / `pty_dead` — the persistent tab disappeared
+  (server restart without respawn? `cron_tag` typo?).
+
+Click the job name to open `/jobs/<id>`. The **Runs** tab shows one line
+per fire with timestamp, attempt number, prompt size and error message.
+The view auto-refreshes every 5 s.
+
+### 4. Confirm the prompt reached Claude
+
+Open the terminal tab (sidebar `manage` → Terminal mode or whichever tab
+is attached to `daily-research`). You should see the prompt appear as if
+you typed it, followed by Claude's streaming response.
+
+```bash
+# server-side receipts
+grep cron_write ~/.codehelm/audit.log | tail
+# → {ts, event:"cron.cron_write", jobId, persistentTabId, cronTag, promptLen, status, attempt}
+tail -f ~/.codehelm/job-runs.jsonl
+# → one JSON object per fire
+```
+
+### 5. Clean up
+
+- Flip the `enabled` toggle on the job to stop firing without deleting.
+- `delete` on the job row removes it from `jobs.json`; the scheduler
+  drops its `croner` instance immediately.
+- `delete` on the persistent tab row kills the PTY
+  (`DELETE /api/persistent-tabs/:id`) and removes the `persistent-tabs.json`
+  entry.
+
+### Failure modes to probe
+
+| Action | Expected |
+| ------ | -------- |
+| Type a long command in the persistent tab, click `run now` before it finishes | `tab_not_ready` (retry scheduled if enabled) |
+| Rename the `cron_tag` on the persistent tab but not the job | `tab_not_found` on next fire |
+| Kill the PTY with `Ctrl+D` / `exit` | Next fire `pty_dead`; the tab row badge flips to `dead`. Click `respawn` to bring it back |
+| Enter a bad cron expression (`* * *`) in the form | Form refuses to submit, server returns `bad_cron` |
