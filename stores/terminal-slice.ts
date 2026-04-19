@@ -82,9 +82,14 @@ interface State {
   sendToActivePane: (data: string) => boolean;
   /** Attach a server-side persistent PTY id to an already-open pane. */
   setPanePersistentId: (tabId: string, paneId: string, persistentId: string) => void;
-  /** Merge server-side persistent tabs into the store, adding any that are not
-   * yet represented. Does not disturb existing tabs. */
+  /** Reconciles the local tab list with the server's persistent-tab list:
+   * adds tabs the server has that we do not, and removes tabs whose
+   * persistent panes no longer exist on the server. Ephemeral tabs are
+   * left alone. Called by bootstrap and on relevant UI events. */
   hydrate: (tabs: ServerPersistentTab[]) => void;
+  /** Removes a tab locally (no DELETE call) — used when the server reports
+   * the persistentId is unknown so we avoid spinning on a 404. */
+  purgeStaleTab: (tabId: string) => void;
 }
 
 export const useTerminalStore = create<State>((set, get) => ({
@@ -272,17 +277,31 @@ export const useTerminalStore = create<State>((set, get) => ({
     }));
   },
   hydrate: (serverTabs) => {
-    if (!serverTabs.length) return;
+    // Reconciliation, not just addition: add tabs the server has that we
+    // don't, AND drop tabs whose persistent panes are no longer on the
+    // server (deleted via /jobs, server file reset, etc.). A tab is "stale"
+    // when every one of its persistent panes points at a persistentId the
+    // server no longer knows. Ephemeral (non-persistent) tabs are never
+    // touched here — they belong only to the client session.
     const state = get();
+    const serverByPid = new Set(serverTabs.map((t) => t.persistentId));
+    const remaining = state.tabs.filter((t) => {
+      const persistentIds = t.panes
+        .map((p) => p.persistentId)
+        .filter((pid): pid is string => typeof pid === 'string');
+      if (persistentIds.length === 0) return true;
+      return persistentIds.some((pid) => serverByPid.has(pid));
+    });
+    const dropped = state.tabs.length - remaining.length;
+
     const knownPersistentIds = new Set<string>();
-    for (const t of state.tabs) {
+    for (const t of remaining) {
       for (const p of t.panes) {
         if (p.persistentId) knownPersistentIds.add(p.persistentId);
       }
     }
     const toAdd = serverTabs.filter((t) => !knownPersistentIds.has(t.persistentId));
-    if (toAdd.length === 0) return;
-    const cap = Math.max(0, MAX_TABS - state.tabs.length);
+    const cap = Math.max(0, MAX_TABS - remaining.length);
     const take = toAdd.slice(0, cap);
     let seq = state._seq;
     const now = Date.now();
@@ -314,11 +333,38 @@ export const useTerminalStore = create<State>((set, get) => ({
         activePaneId: paneId,
       };
     });
-    set((curr) => ({
-      _seq: seq,
-      tabs: [...curr.tabs, ...newTabs],
-      activeTabId: curr.activeTabId ?? newTabs[0]?.id ?? null,
-    }));
+    if (dropped === 0 && newTabs.length === 0) return;
+    const nextTabs = [...remaining, ...newTabs];
+    set((curr) => {
+      let nextActive = curr.activeTabId;
+      if (nextActive && !nextTabs.some((t) => t.id === nextActive)) {
+        nextActive = nextTabs[0]?.id ?? null;
+      }
+      const writers = curr.writers;
+      // Clean writers map entries tied to panes that went away.
+      const liveIds = new Set<string>();
+      for (const t of nextTabs) for (const p of t.panes) liveIds.add(p.id);
+      for (const id of Array.from(writers.keys())) {
+        if (!liveIds.has(id)) writers.delete(id);
+      }
+      return { _seq: seq, tabs: nextTabs, activeTabId: nextActive };
+    });
+  },
+  /** Client-side-only tab removal: fires when WS attach reports the tab is
+   * gone server-side. No DELETE call (there is nothing to delete). */
+  purgeStaleTab: (tabId) => {
+    set((state) => {
+      const remaining = state.tabs.filter((t) => t.id !== tabId);
+      if (remaining.length === state.tabs.length) return state;
+      let active = state.activeTabId;
+      if (active === tabId) active = remaining[0]?.id ?? null;
+      const writers = state.writers;
+      const gone = state.tabs.find((t) => t.id === tabId);
+      if (gone) {
+        for (const p of gone.panes) writers.delete(p.id);
+      }
+      return { tabs: remaining, activeTabId: active };
+    });
   },
 }));
 

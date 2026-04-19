@@ -55,6 +55,7 @@ export function Terminal({
   const registerWriter = useTerminalStore((s) => s.registerWriter);
   const unregisterWriter = useTerminalStore((s) => s.unregisterWriter);
   const setPanePersistentId = useTerminalStore((s) => s.setPanePersistentId);
+  const purgeStaleTab = useTerminalStore((s) => s.purgeStaleTab);
   const [gitStatus, setGitStatus] = useState<{ branch: string | null; dirty: boolean } | null>(
     null,
   );
@@ -94,6 +95,13 @@ export function Terminal({
     },
     onError: (code) => {
       termRef.current?.write(`\r\n\x1b[31m[pty error: ${code}]\x1b[0m\r\n`);
+      // Fatal codes: the server says this persistent tab is truly gone
+      // (file deleted via /jobs, different persistentId after store reset).
+      // Remove it from Zustand locally so closeTab will not fire a DELETE
+      // that 404s, and so the next navigation does not keep re-attaching.
+      if ((code === 'persistent_not_found' || code === 'pty_dead') && tabId) {
+        setTimeout(() => purgeStaleTab(tabId), 0);
+      }
     },
     onStatus: (s) => {
       setStatus(s);

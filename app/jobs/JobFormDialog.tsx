@@ -12,6 +12,7 @@ import { CHButton } from '@/components/ui/ch-button';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -104,6 +105,10 @@ export function JobFormDialog({ jobId, onClose }: { jobId: string | null; onClos
       <DialogContent style={{ maxWidth: 720 }}>
         <DialogHeader>
           <DialogTitle>{isEdit ? 'Edit job' : 'New cron job'}</DialogTitle>
+          <DialogDescription>
+            Schedule a recurring prompt for a persistent Claude Code tab. The
+            job writes into the target tab&apos;s PTY as if you typed.
+          </DialogDescription>
         </DialogHeader>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12, fontSize: 12 }}>
