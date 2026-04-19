@@ -63,7 +63,11 @@ export const useUiStore = create<UiState>((set) => ({
     set(() => ({
       selectedProjectSlug: slug,
       selectedSessionId: null,
-      terminalOpen: false,
+      // Do NOT reset `terminalOpen`: persistent tabs stay alive across project
+      // switches, so tearing the terminal mode down every time the user picks
+      // a project in the sidebar would hide their workspace until they
+      // re-click the Terminal tab. Editor is still closed because it is
+      // scoped to a single CLAUDE.md file.
       editorOpen: false,
     })),
   setSelectedSession: (id) => set({ selectedSessionId: id }),
