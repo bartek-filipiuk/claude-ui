@@ -62,26 +62,60 @@ export function Terminal({
   const [gitStatus, setGitStatus] = useState<{ branch: string | null; dirty: boolean } | null>(
     null,
   );
+  // Live cwd — initial value is the spawn-time cwd from props, but updated
+  // from the server whenever the user `cd`s inside the shell.
+  const [actualCwd, setActualCwd] = useState(cwd);
+  // persistentId becomes known only after registerPersistentTab succeeds on
+  // mount. Kept in state so effects can subscribe and start polling head-info
+  // as soon as we have an id to query.
+  const [effectivePersistentId, setEffectivePersistentId] = useState<string | undefined>(
+    persistentId,
+  );
+  const headInfoInflightRef = useRef(false);
+  const headInfoDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const fetchGitStatus = useCallback(async () => {
+  const refreshHeadInfo = useCallback(async () => {
+    if (!effectivePersistentId) return;
+    if (headInfoInflightRef.current) return;
+    headInfoInflightRef.current = true;
     try {
-      const res = await fetch(`/api/git/status?cwd=${encodeURIComponent(cwd)}`, {
-        credentials: 'same-origin',
-      });
-      if (!res.ok) {
-        setGitStatus(null);
-        return;
-      }
-      const body = (await res.json()) as { branch: string | null; dirty: boolean };
-      setGitStatus(body);
+      const res = await fetch(
+        `/api/pty/head-info?persistentId=${encodeURIComponent(effectivePersistentId)}`,
+        { credentials: 'same-origin' },
+      );
+      if (!res.ok) return;
+      const body = (await res.json()) as {
+        cwd: string | null;
+        branch: string | null;
+        dirty: boolean;
+      };
+      if (body.cwd) setActualCwd(body.cwd);
+      setGitStatus({ branch: body.branch, dirty: body.dirty });
     } catch {
-      setGitStatus(null);
+      /* transient — next trigger will retry */
+    } finally {
+      headInfoInflightRef.current = false;
     }
-  }, [cwd]);
+  }, [effectivePersistentId]);
 
+  // Refs let event handlers registered in the mount-once xterm effect reach
+  // the current refresh function without re-subscribing on every rerender.
+  const refreshHeadInfoRef = useRef(refreshHeadInfo);
   useEffect(() => {
-    void fetchGitStatus();
-  }, [fetchGitStatus]);
+    refreshHeadInfoRef.current = refreshHeadInfo;
+  }, [refreshHeadInfo]);
+
+  const scheduleHeadInfoRefresh = useCallback(() => {
+    if (headInfoDebounceRef.current) clearTimeout(headInfoDebounceRef.current);
+    headInfoDebounceRef.current = setTimeout(() => {
+      headInfoDebounceRef.current = null;
+      void refreshHeadInfoRef.current();
+    }, 400);
+  }, []);
+  const scheduleHeadInfoRefreshRef = useRef(scheduleHeadInfoRefresh);
+  useEffect(() => {
+    scheduleHeadInfoRefreshRef.current = scheduleHeadInfoRefresh;
+  }, [scheduleHeadInfoRefresh]);
   const hostRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<import('@xterm/xterm').Terminal | null>(null);
   const fitRef = useRef<import('@xterm/addon-fit').FitAddon | null>(null);
@@ -167,7 +201,13 @@ export function Terminal({
       // the first render, which is when split panes' final geometry settles
       // and mismatches would otherwise desync the shell's cursor math.
       let initialResizeSent = false;
-      term.onData((data) => write(data));
+      term.onData((data) => {
+        write(data);
+        // Enter (CR) means the user just dispatched a command — `cd` and
+        // `git checkout` are the cases we care about. Debounce the refresh
+        // so a pasted multi-line block only fires one request.
+        if (data.includes('\r')) scheduleHeadInfoRefreshRef.current();
+      });
       term.onResize(({ cols: c, rows: r }) => {
         if (!initialResizeSent) {
           initialResizeSent = true;
@@ -215,6 +255,7 @@ export function Terminal({
         if (!disposed && reg) {
           effectivePersistentId = reg.persistentId;
           attachedServerSideRef.current = true;
+          setEffectivePersistentId(reg.persistentId);
           if (tabId && paneId) {
             setPanePersistentId(tabId, paneId, reg.persistentId);
           }
@@ -237,6 +278,10 @@ export function Terminal({
       if (resizeTimeoutRef.current) {
         clearTimeout(resizeTimeoutRef.current);
         resizeTimeoutRef.current = null;
+      }
+      if (headInfoDebounceRef.current) {
+        clearTimeout(headInfoDebounceRef.current);
+        headInfoDebounceRef.current = null;
       }
       // Null the fit ref before disposing the terminal so any in-flight
       // ResizeObserver / custom-event handler that reaches `fitRef.current?.fit()`
@@ -283,6 +328,51 @@ export function Terminal({
     return () => window.removeEventListener('codehelm:pane-resize-end', onEnd);
   }, []);
 
+  // Refit on wake from suspend / tab return. After suspend the browser can
+  // restore the page with stale font metrics cached inside xterm's render
+  // service — FitAddon reads `dimensions.css.cell.width` from that cache,
+  // computes too few columns, and the terminal ends up rendered at ~1/3 of
+  // the real container width. A plain fit() does not help because xterm has
+  // no reason to re-measure on its own. We force a re-measurement by briefly
+  // nudging fontSize (the setter invalidates the cache), wait for
+  // document.fonts.ready so the measurement runs against loaded glyphs, and
+  // run fit() across three frames so the compositor, DPR, and layout all
+  // have time to settle.
+  useEffect(() => {
+    const refit = () => {
+      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
+      const doFit = () => {
+        const term = termRef.current;
+        const fit = fitRef.current;
+        if (!term || !fit) return;
+        try {
+          const fs = term.options.fontSize ?? 13;
+          term.options.fontSize = fs + 1;
+          term.options.fontSize = fs;
+          fit.fit();
+        } catch {
+          /* ignore */
+        }
+      };
+      const run = () => {
+        requestAnimationFrame(doFit);
+        setTimeout(doFit, 150);
+        setTimeout(doFit, 500);
+      };
+      if (typeof document !== 'undefined' && document.fonts && 'ready' in document.fonts) {
+        document.fonts.ready.then(run).catch(run);
+      } else {
+        run();
+      }
+    };
+    document.addEventListener('visibilitychange', refit);
+    window.addEventListener('focus', refit);
+    return () => {
+      document.removeEventListener('visibilitychange', refit);
+      window.removeEventListener('focus', refit);
+    };
+  }, []);
+
   // React to font-size changes from settings without re-mounting xterm.
   useEffect(() => {
     const term = termRef.current;
@@ -295,6 +385,35 @@ export function Terminal({
       /* ignore */
     }
   }, [fontSize]);
+
+  // Refresh cwd/branch whenever the PTY first becomes ready (mount, RESTART,
+  // reconnect). `connecting`/`closed`/`error` are skipped — they have no
+  // useful cwd to report.
+  useEffect(() => {
+    if (status !== 'ready') return;
+    void refreshHeadInfo();
+  }, [status, refreshHeadInfo]);
+
+  // Backup polling + react-to-return-to-tab. Enter-in-shell is the primary
+  // trigger for interactive changes; this catches external changes (git
+  // checkout from an IDE, another terminal) and any Enter we missed. Paused
+  // when the tab is hidden so background tabs don't burn the rate limit.
+  useEffect(() => {
+    if (!effectivePersistentId) return;
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void refreshHeadInfo();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onVisible);
+    const iv = setInterval(() => {
+      if (document.visibilityState === 'visible') void refreshHeadInfo();
+    }, 20_000);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onVisible);
+      clearInterval(iv);
+    };
+  }, [effectivePersistentId, refreshHeadInfo]);
 
   const handleClear = () => {
     termRef.current?.clear();
@@ -317,15 +436,19 @@ export function Terminal({
     toastInfo('Terminal buffer saved', { description: a.download });
   };
 
-  const segments = cwd.split('/').filter(Boolean);
-  const leaf = segments[segments.length - 1] ?? cwd;
+  const segments = actualCwd.split('/').filter(Boolean);
+  const leaf = segments[segments.length - 1] ?? actualCwd;
   const prefix = segments.slice(0, -1);
 
   return (
     <div className="term-wrap">
       <div className="term-head">
         <span className="cwd">
-          {cwd.startsWith('/') ? <span className="sep">/</span> : <span className="home">~</span>}
+          {actualCwd.startsWith('/') ? (
+            <span className="sep">/</span>
+          ) : (
+            <span className="home">~</span>
+          )}
           {prefix.map((seg, i) => (
             <span key={`${seg}-${i}`}>
               {seg}
@@ -338,7 +461,7 @@ export function Terminal({
           <button
             type="button"
             className="gitbadge"
-            onClick={() => void fetchGitStatus()}
+            onClick={() => void refreshHeadInfo()}
             title={gitStatus.dirty ? `${gitStatus.branch} (dirty)` : gitStatus.branch}
           >
             <span>⎇ {gitStatus.branch}</span>
