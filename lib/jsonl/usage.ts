@@ -13,7 +13,13 @@ export interface ExtractedUsage extends UsageTokens {
 
 /**
  * Per-million-token pricing in USD.
- * cacheWrite ≈ input billed at cache-creation rate, cacheRead at cache-read rate.
+ * cacheWrite ≈ input billed at cache-creation rate (5-min TTL, 1.25× input),
+ * cacheRead at the 10%-of-input cache-hit rate.
+ *
+ * Rates current as of April 2026 (Anthropic pricing page):
+ *   Opus 4.7 / 4.6:  $5  / $25 in-out
+ *   Sonnet 4.6 / 4.5: $3 / $15
+ *   Haiku 4.5:        $1 / $5
  */
 export interface ModelRate {
   input: number;
@@ -27,7 +33,7 @@ export type ModelRateKey = (typeof MODEL_RATE_KEYS)[number];
 export type ModelPricing = Record<ModelRateKey, ModelRate>;
 
 export const DEFAULT_MODEL_PRICING: ModelPricing = {
-  'opus-4': { input: 15, output: 75, cacheWrite: 18.75, cacheRead: 1.5 },
+  'opus-4': { input: 5, output: 25, cacheWrite: 6.25, cacheRead: 0.5 },
   'sonnet-4': { input: 3, output: 15, cacheWrite: 3.75, cacheRead: 0.3 },
   'haiku-4': { input: 1, output: 5, cacheWrite: 1.25, cacheRead: 0.1 },
   default: { input: 3, output: 15, cacheWrite: 3.75, cacheRead: 0.3 },

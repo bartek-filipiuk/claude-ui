@@ -20,7 +20,10 @@ import {
   CommandItem,
   CommandList,
 } from '@/components/ui/command';
+import { Kbd } from '@/components/ui/kbd';
+import { IconSearch } from '@/components/ui/icons';
 import { isPaletteHotkey } from '@/lib/ui/command-palette-hotkey';
+import { paletteOpenEvent } from '@/lib/ui/overlay-events';
 import { toastInfo } from '@/lib/ui/toast';
 
 export interface PaletteProject {
@@ -78,8 +81,15 @@ export function CommandPalette() {
       event.preventDefault();
       setOpen((prev) => !prev);
     }
+    function onOpen() {
+      setOpen(true);
+    }
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener(paletteOpenEvent, onOpen);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener(paletteOpenEvent, onOpen);
+    };
   }, []);
 
   const paletteProjects = React.useMemo(
@@ -105,6 +115,7 @@ export function CommandPalette() {
       projectSlug: activeProject.slug,
       cwd: activeProject.resolvedCwd,
       title: `shell (${activeProject.slug.slice(-24)})`,
+      aliasKey: `shell:${activeProject.slug}:${activeProject.resolvedCwd}`,
     });
     if (id) openTerminal(activeProject.resolvedCwd);
     setOpen(false);
@@ -135,11 +146,7 @@ export function CommandPalette() {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent
-        className="max-w-xl overflow-hidden p-0"
-        hideClose
-        data-testid="command-palette"
-      >
+      <DialogContent bare hideClose className="ch-modal" data-testid="command-palette">
         <VisuallyHidden>
           <DialogTitle>Command palette</DialogTitle>
           <DialogDescription>
@@ -147,33 +154,56 @@ export function CommandPalette() {
           </DialogDescription>
         </VisuallyHidden>
         <Command label="Command palette">
-          <CommandInput placeholder="Search commands or projects…" />
-          <CommandList>
-            <CommandEmpty>No matches.</CommandEmpty>
+          <div className="cmd-search">
+            <IconSearch style={{ color: 'var(--fg-3)' }} />
+            <CommandInput placeholder="Type a command, or search…" />
+            <Kbd>esc</Kbd>
+          </div>
+          <CommandList className="modal-body">
+            <CommandEmpty>
+              <div style={{ padding: 24, textAlign: 'center', color: 'var(--fg-3)' }}>
+                No matches.
+              </div>
+            </CommandEmpty>
             <CommandGroup heading="Actions">
               <CommandItem
                 value="new shell current project shell terminal"
                 onSelect={newShellHere}
                 disabled={!activeProject?.resolvedCwd}
+                className="cmd-item"
               >
-                New shell in current project
+                <span className="glyph">+</span>
+                <span className="lbl">New shell in current project</span>
+                <span className="sub">Ctrl+T</span>
               </CommandItem>
               <CommandItem
                 value="open claude md current project"
                 onSelect={openProjectClaudeMd}
                 disabled={!activeProject}
+                className="cmd-item"
               >
-                Open CLAUDE.md (current project)
+                <span className="glyph">✎</span>
+                <span className="lbl">Open CLAUDE.md (current project)</span>
+                <span className="sub" />
               </CommandItem>
-              <CommandItem value="open claude md global" onSelect={openGlobalClaudeMd}>
-                Open CLAUDE.md (global)
+              <CommandItem
+                value="open claude md global"
+                onSelect={openGlobalClaudeMd}
+                className="cmd-item"
+              >
+                <span className="glyph">✎</span>
+                <span className="lbl">Open CLAUDE.md (global)</span>
+                <span className="sub" />
               </CommandItem>
               <CommandItem
                 value="close tab terminal current"
                 onSelect={closeCurrentTab}
                 disabled={!activeTabId}
+                className="cmd-item"
               >
-                Close current terminal tab
+                <span className="glyph">×</span>
+                <span className="lbl">Close current terminal tab</span>
+                <span className="sub">Ctrl+W</span>
               </CommandItem>
             </CommandGroup>
             {recent.length > 0 && (
@@ -183,8 +213,11 @@ export function CommandPalette() {
                     key={`recent-${p.slug}`}
                     value={`recent ${p.alias ?? ''} ${p.displayPath} ${p.slug}`}
                     onSelect={() => selectProject(p.slug)}
+                    className="cmd-item"
                   >
-                    {paletteLabel(p)}
+                    <span className="glyph">▸</span>
+                    <span className="lbl">{p.alias ?? p.displayPath}</span>
+                    <span className="sub">{p.displayPath}</span>
                   </CommandItem>
                 ))}
               </CommandGroup>
@@ -196,20 +229,27 @@ export function CommandPalette() {
                     key={`all-${p.slug}`}
                     value={`project ${p.alias ?? ''} ${p.displayPath} ${p.slug}`}
                     onSelect={() => selectProject(p.slug)}
+                    className="cmd-item"
                   >
-                    {paletteLabel(p)}
+                    <span className="glyph">▸</span>
+                    <span className="lbl">{p.alias ?? p.displayPath}</span>
+                    <span className="sub">{p.displayPath}</span>
                   </CommandItem>
                 ))}
               </CommandGroup>
             )}
           </CommandList>
+          <div className="modal-foot">
+            <Kbd>↑</Kbd>
+            <Kbd>↓</Kbd>
+            <span>navigate</span>
+            <span style={{ marginLeft: 14 }}>
+              <Kbd>↵</Kbd> select
+            </span>
+            <span style={{ marginLeft: 'auto' }}>codehelm · command palette</span>
+          </div>
         </Command>
       </DialogContent>
     </Dialog>
   );
-}
-
-function paletteLabel(p: PaletteProject): string {
-  if (p.alias) return `${p.alias} — ${p.displayPath}`;
-  return p.displayPath;
 }

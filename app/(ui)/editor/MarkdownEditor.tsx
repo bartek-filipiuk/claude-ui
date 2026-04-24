@@ -2,6 +2,9 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { CHButton } from '@/components/ui/ch-button';
+import { Kbd } from '@/components/ui/kbd';
+import { IconChev } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
@@ -206,92 +209,99 @@ export function MarkdownEditor() {
   const canSwitchProject = !!projectSlug;
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      <div className="flex items-center justify-between gap-2 border-b border-neutral-800 bg-neutral-950 px-3 py-2">
-        <div className="flex items-center gap-1">
-          <Button
-            size="sm"
-            variant={target === 'project' ? 'secondary' : 'ghost'}
+    <div className="editor-wrap">
+      <div className="editor-head">
+        <div className="editor-toggle">
+          <button
+            type="button"
+            className={target === 'project' ? 'on' : ''}
             onClick={() => setTarget('project')}
             disabled={!canSwitchProject}
           >
             Per-project
-          </Button>
-          <Button
-            size="sm"
-            variant={target === 'global' ? 'secondary' : 'ghost'}
+          </button>
+          <button
+            type="button"
+            className={target === 'global' ? 'on' : ''}
             onClick={() => setTarget('global')}
           >
             Global
-          </Button>
-          {recent.length > 0 && (
-            <Popover>
-              <PopoverTrigger
-                className="ml-1 rounded px-2 py-0.5 text-[11px] text-neutral-400 hover:bg-neutral-800 hover:text-neutral-100"
-                title="Recently opened CLAUDE.md files"
-              >
-                Recent ▾
-              </PopoverTrigger>
-              <PopoverContent className="w-64 p-1">
-                <ul className="flex flex-col">
-                  {recent.map((e, i) => {
-                    const isCurrent =
-                      e.kind === target && (e.kind === 'global' || e.slug === projectSlug);
-                    return (
-                      <li key={`${e.kind}:${e.slug ?? 'global'}:${i}`}>
-                        <button
-                          type="button"
-                          onClick={() => openRecent(e)}
-                          disabled={isCurrent}
-                          className={`flex w-full items-center gap-2 rounded px-2 py-1 text-left text-xs ${
-                            isCurrent
-                              ? 'cursor-default bg-neutral-800 text-neutral-400'
-                              : 'text-neutral-200 hover:bg-neutral-800'
-                          }`}
-                        >
-                          <span className="font-mono text-[9px] uppercase tracking-wider text-neutral-500">
-                            {e.kind === 'global' ? 'glb' : 'prj'}
-                          </span>
-                          <span className="truncate">{e.label}</span>
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </PopoverContent>
-            </Popover>
-          )}
+          </button>
         </div>
-        <div className="flex items-center gap-2">
-          <span
-            className="truncate font-mono text-[10px] text-neutral-500"
-            title={query.data?.path}
-          >
-            {query.data?.path ?? ''}
-          </span>
-          {dirty && <span className="text-[10px] text-amber-400">● unsaved</span>}
-          <Button
-            size="sm"
-            variant={preview ? 'secondary' : 'ghost'}
-            onClick={togglePreview}
-            aria-pressed={preview}
-            title="Toggle markdown preview"
-          >
-            Preview
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => setDiffOpen(true)}
-            disabled={!query.data || !mounted}
-            title="Show diff vs disk"
-          >
-            Diff
-          </Button>
-          <Button size="sm" onClick={doSave} disabled={!dirty || save.isPending}>
-            {save.isPending ? 'Saving…' : 'Save (Ctrl+S)'}
-          </Button>
-        </div>
+        {recent.length > 0 && (
+          <Popover>
+            <PopoverTrigger className="editor-recent" title="Recently opened CLAUDE.md files">
+              <span style={{ color: 'var(--fg-3)' }}>recent</span>
+              <span className="name">
+                {recent[0]?.kind === 'global' ? 'global' : (recent[0]?.label ?? '—')}
+              </span>
+              <IconChev dir="down" />
+            </PopoverTrigger>
+            <PopoverContent className="w-64 p-1">
+              <ul className="flex flex-col">
+                {recent.map((e, i) => {
+                  const isCurrent =
+                    e.kind === target && (e.kind === 'global' || e.slug === projectSlug);
+                  return (
+                    <li key={`${e.kind}:${e.slug ?? 'global'}:${i}`}>
+                      <button
+                        type="button"
+                        onClick={() => openRecent(e)}
+                        disabled={isCurrent}
+                        className={`flex w-full items-center gap-2 rounded px-2 py-1 text-left text-xs ${
+                          isCurrent
+                            ? 'cursor-default bg-[color:var(--bg-3)] text-[color:var(--fg-3)]'
+                            : 'text-[color:var(--fg-1)] hover:bg-[color:var(--bg-2)]'
+                        }`}
+                      >
+                        <span className="mono text-[9px] uppercase tracking-wider text-[color:var(--fg-4)]">
+                          {e.kind === 'global' ? 'glb' : 'prj'}
+                        </span>
+                        <span className="truncate">{e.label}</span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </PopoverContent>
+          </Popover>
+        )}
+        <span
+          className="mono"
+          style={{ fontSize: 10.5, color: 'var(--fg-3)' }}
+          title={query.data?.path}
+        >
+          {query.data?.path ?? ''}
+        </span>
+        <div style={{ flex: 1 }} />
+        {dirty && <span className="editor-dirty">● unsaved</span>}
+        <CHButton
+          variant={preview ? 'on' : 'outline'}
+          size="sm"
+          onClick={togglePreview}
+          aria-pressed={preview}
+          title="Toggle markdown preview"
+        >
+          preview
+        </CHButton>
+        <CHButton
+          variant="outline"
+          size="sm"
+          onClick={() => setDiffOpen(true)}
+          disabled={!query.data || !mounted}
+          title="Show diff vs disk"
+        >
+          diff
+        </CHButton>
+        <CHButton
+          variant="primary"
+          size="sm"
+          onClick={doSave}
+          disabled={!dirty || save.isPending}
+          title="Save (Ctrl+S)"
+        >
+          {save.isPending ? 'saving…' : 'save'} · <Kbd>⌘S</Kbd>
+        </CHButton>
       </div>
       <DiffDialog
         open={diffOpen}
@@ -306,16 +316,18 @@ export function MarkdownEditor() {
           setDiffOpen(false);
         }}
       />
-      <div className="flex min-h-0 flex-1">
+      <div className={`editor-body ${preview ? '' : 'single'}`}>
         <div className="relative min-h-0 flex-1">
-          {/* Host is always in the DOM so CodeMirror's mount-time effect has
-              a real element to attach to. Skeleton overlays while loading. */}
           <div
             ref={hostRef}
             className="h-full min-h-0 [&_.cm-editor]:h-full [&_.cm-scroller]:font-mono"
+            style={{ background: 'var(--bg-0)' }}
           />
           {isLoading && (
-            <div className="absolute inset-0 flex flex-col gap-2 bg-neutral-950 p-4">
+            <div
+              className="absolute inset-0 flex flex-col gap-2 p-4"
+              style={{ background: 'var(--bg-0)' }}
+            >
               {Array.from({ length: 6 }).map((_, i) => (
                 <Skeleton key={i} className="h-4 w-full" />
               ))}
@@ -323,10 +335,7 @@ export function MarkdownEditor() {
           )}
         </div>
         {preview && (
-          <div
-            className="min-h-0 flex-1 overflow-auto border-l border-neutral-800 bg-neutral-950 p-4"
-            data-testid="markdown-preview"
-          >
+          <div className="editor-preview" data-testid="markdown-preview">
             <Markdown text={previewText} />
           </div>
         )}

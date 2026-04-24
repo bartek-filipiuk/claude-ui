@@ -5,6 +5,7 @@ import chokidar from 'chokidar';
 import { PATHS } from '@/lib/server/config';
 import { isValidSlug } from '@/lib/jsonl/slug';
 import { logger } from '@/lib/server/logger';
+import { getSingleton } from '@/lib/server/singleton';
 
 const SESSION_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.jsonl$/i;
 
@@ -116,7 +117,7 @@ class ProjectsWatcher extends EventEmitter {
   }
 }
 
-export const projectsWatcher = new ProjectsWatcher();
+export const projectsWatcher = getSingleton('projectsWatcher', () => new ProjectsWatcher());
 
 // Tests may need to reset the singleton between server starts.
 export function _resetWatcherForTests(): void {

@@ -1,8 +1,11 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+// @vitest-environment jsdom
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useTerminalStore, TERMINAL_TAB_CAP } from '@/stores/terminal-slice';
+import { getTabAlias } from '@/lib/ui/tab-aliases';
 
 beforeEach(() => {
   useTerminalStore.getState().clear();
+  if (typeof window !== 'undefined') window.localStorage.clear();
 });
 
 describe('terminal-slice', () => {
@@ -12,6 +15,20 @@ describe('terminal-slice', () => {
     const s = useTerminalStore.getState();
     expect(s.tabs).toHaveLength(1);
     expect(s.activeTabId).toBe(id);
+  });
+
+  it('openTab initializes layout="single" with one pane holding shell config', () => {
+    const id = useTerminalStore.getState().openTab({
+      cwd: '/tmp/a',
+      title: 'a',
+      initCommand: 'echo hi',
+    })!;
+    const tab = useTerminalStore.getState().tabs.find((t) => t.id === id)!;
+    expect(tab.layout).toBe('single');
+    expect(tab.panes).toHaveLength(1);
+    expect(tab.panes[0]!.cwd).toBe('/tmp/a');
+    expect(tab.panes[0]!.initCommand).toBe('echo hi');
+    expect(tab.activePaneId).toBe(tab.panes[0]!.id);
   });
 
   it('caps at 16 tabs — the 17th returns null', () => {
@@ -50,5 +67,175 @@ describe('terminal-slice', () => {
     const a = s.openTab({ cwd: '/a', title: 'a' })!;
     useTerminalStore.getState().setActive('nope');
     expect(useTerminalStore.getState().activeTabId).toBe(a);
+  });
+
+  describe('renameTab', () => {
+    it('updates the title of an existing tab', () => {
+      const id = useTerminalStore.getState().openTab({ cwd: '/a', title: 'original' })!;
+      useTerminalStore.getState().renameTab(id, 'my alias');
+      expect(useTerminalStore.getState().tabs.find((t) => t.id === id)?.title).toBe('my alias');
+    });
+
+    it('trims whitespace and rejects empty-after-trim input', () => {
+      const id = useTerminalStore.getState().openTab({ cwd: '/a', title: 'original' })!;
+      useTerminalStore.getState().renameTab(id, '  spaced  ');
+      expect(useTerminalStore.getState().tabs.find((t) => t.id === id)?.title).toBe('spaced');
+
+      useTerminalStore.getState().renameTab(id, '   ');
+      expect(useTerminalStore.getState().tabs.find((t) => t.id === id)?.title).toBe('spaced');
+    });
+
+    it('caps at the 40-char limit', () => {
+      const id = useTerminalStore.getState().openTab({ cwd: '/a', title: 'original' })!;
+      const huge = 'x'.repeat(100);
+      useTerminalStore.getState().renameTab(id, huge);
+      const after = useTerminalStore.getState().tabs.find((t) => t.id === id)?.title ?? '';
+      expect(after.length).toBe(40);
+    });
+
+    it('is a no-op for unknown ids', () => {
+      const id = useTerminalStore.getState().openTab({ cwd: '/a', title: 'original' })!;
+      useTerminalStore.getState().renameTab('nope', 'other');
+      expect(useTerminalStore.getState().tabs.find((t) => t.id === id)?.title).toBe('original');
+    });
+
+    it('persists rename to localStorage when aliasKey is present', () => {
+      const id = useTerminalStore
+        .getState()
+        .openTab({ cwd: '/a', title: 'generic', aliasKey: 'resume:abc' })!;
+      useTerminalStore.getState().renameTab(id, 'my tab');
+      expect(getTabAlias('resume:abc')).toBe('my tab');
+    });
+
+    it('does NOT persist rename when aliasKey is absent', () => {
+      const id = useTerminalStore.getState().openTab({ cwd: '/a', title: 'generic' })!;
+      useTerminalStore.getState().renameTab(id, 'my tab');
+      expect(getTabAlias('resume:abc')).toBeNull();
+      // store still updates the in-memory title
+      expect(useTerminalStore.getState().tabs.find((t) => t.id === id)?.title).toBe('my tab');
+    });
+  });
+
+  describe('pane layouts', () => {
+    it('setLayout("quad") grows panes to 4 with same cwd/shell defaults', () => {
+      const id = useTerminalStore.getState().openTab({ cwd: '/x', title: 'x' })!;
+      useTerminalStore.getState().setLayout(id, 'quad');
+      const tab = useTerminalStore.getState().tabs.find((t) => t.id === id)!;
+      expect(tab.layout).toBe('quad');
+      expect(tab.panes).toHaveLength(4);
+      expect(tab.panes[1]!.cwd).toBe('/x');
+      expect(tab.panes[1]!.initCommand).toBeUndefined();
+      expect(tab.activePaneId).toBe(tab.panes[0]!.id);
+    });
+
+    it('setLayout("single") shrinks panes to 1 (keeps active one)', () => {
+      const id = useTerminalStore.getState().openTab({ cwd: '/x', title: 'x' })!;
+      useTerminalStore.getState().setLayout(id, 'quad');
+      const afterQuad = useTerminalStore.getState().tabs.find((t) => t.id === id)!;
+      const keepId = afterQuad.panes[2]!.id;
+      useTerminalStore.getState().setActivePane(id, keepId);
+      useTerminalStore.getState().setLayout(id, 'single');
+      const tab = useTerminalStore.getState().tabs.find((t) => t.id === id)!;
+      expect(tab.layout).toBe('single');
+      expect(tab.panes).toHaveLength(1);
+      expect(tab.panes[0]!.id).toBe(keepId);
+      expect(tab.activePaneId).toBe(keepId);
+    });
+
+    it('closePane removes the pane; if it was last the tab closes', () => {
+      const id = useTerminalStore.getState().openTab({ cwd: '/x', title: 'x' })!;
+      useTerminalStore.getState().setLayout(id, 'h');
+      const tab = useTerminalStore.getState().tabs.find((t) => t.id === id)!;
+      const victim = tab.panes[1]!.id;
+      useTerminalStore.getState().closePane(id, victim);
+      const after = useTerminalStore.getState().tabs.find((t) => t.id === id)!;
+      expect(after.panes).toHaveLength(1);
+      expect(after.layout).toBe('single');
+      useTerminalStore.getState().closePane(id, after.panes[0]!.id);
+      expect(useTerminalStore.getState().tabs.find((t) => t.id === id)).toBeUndefined();
+    });
+
+    it('setActivePane refuses unknown paneId', () => {
+      const id = useTerminalStore.getState().openTab({ cwd: '/x', title: 'x' })!;
+      const orig = useTerminalStore.getState().tabs.find((t) => t.id === id)!.activePaneId;
+      useTerminalStore.getState().setActivePane(id, 'nope');
+      expect(useTerminalStore.getState().tabs.find((t) => t.id === id)!.activePaneId).toBe(orig);
+    });
+
+    it('sendToActivePane routes to writer keyed by activePaneId', () => {
+      const id = useTerminalStore.getState().openTab({ cwd: '/x', title: 'x' })!;
+      const paneId = useTerminalStore.getState().tabs.find((t) => t.id === id)!.activePaneId;
+      const writer = vi.fn();
+      useTerminalStore.getState().registerWriter(paneId, writer);
+      const ok = useTerminalStore.getState().sendToActivePane('hi\r');
+      expect(ok).toBe(true);
+      expect(writer).toHaveBeenCalledWith('hi\r');
+    });
+  });
+
+  describe('openTab title source', () => {
+    it('always uses cfg.title and ignores any localStorage alias for the key', () => {
+      // Pre-seed as if a previous session wrote this — openTab used to read
+      // it, which caused sibling shell tabs (shell:<slug>:<cwd>) to inherit
+      // each other's rename. The new contract: server-side title is the
+      // source of truth, client-side localStorage is never used to initialise
+      // a freshly opened tab.
+      window.localStorage.setItem(
+        'codehelm:tab-aliases',
+        JSON.stringify({ 'resume:abc': 'saved alias' }),
+      );
+      const id = useTerminalStore
+        .getState()
+        .openTab({ cwd: '/a', title: 'default title', aliasKey: 'resume:abc' })!;
+      expect(useTerminalStore.getState().tabs.find((t) => t.id === id)?.title).toBe(
+        'default title',
+      );
+    });
+
+    it('uses cfg.title when no alias is stored either', () => {
+      const id = useTerminalStore
+        .getState()
+        .openTab({ cwd: '/a', title: 'default title', aliasKey: 'resume:xyz' })!;
+      expect(useTerminalStore.getState().tabs.find((t) => t.id === id)?.title).toBe(
+        'default title',
+      );
+    });
+  });
+
+  describe('editTab', () => {
+    it('clears initCommand when explicit null is passed', () => {
+      const id = useTerminalStore
+        .getState()
+        .openTab({ cwd: '/a', title: 'x', initCommand: 'claude --resume foo' })!;
+      useTerminalStore.getState().editTab(id, { initCommand: null });
+      const tab = useTerminalStore.getState().tabs.find((t) => t.id === id);
+      expect(tab?.initCommand).toBeUndefined();
+    });
+
+    it('leaves initCommand untouched when patch omits it', () => {
+      const id = useTerminalStore
+        .getState()
+        .openTab({ cwd: '/a', title: 'x', initCommand: 'claude --resume foo' })!;
+      useTerminalStore.getState().editTab(id, { title: 'renamed' });
+      const tab = useTerminalStore.getState().tabs.find((t) => t.id === id);
+      expect(tab?.title).toBe('renamed');
+      expect(tab?.initCommand).toBe('claude --resume foo');
+    });
+
+    it('updates both title and initCommand atomically', () => {
+      const id = useTerminalStore.getState().openTab({ cwd: '/a', title: 'x' })!;
+      useTerminalStore.getState().editTab(id, { title: 'renamed', initCommand: 'claude' });
+      const tab = useTerminalStore.getState().tabs.find((t) => t.id === id);
+      expect(tab?.title).toBe('renamed');
+      expect(tab?.initCommand).toBe('claude');
+    });
+
+    it('whitespace-only title is ignored, command still applies', () => {
+      const id = useTerminalStore.getState().openTab({ cwd: '/a', title: 'orig' })!;
+      useTerminalStore.getState().editTab(id, { title: '   ', initCommand: 'claude' });
+      const tab = useTerminalStore.getState().tabs.find((t) => t.id === id);
+      expect(tab?.title).toBe('orig');
+      expect(tab?.initCommand).toBe('claude');
+    });
   });
 });
